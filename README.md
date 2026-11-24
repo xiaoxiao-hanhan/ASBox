@@ -66,22 +66,3 @@
 1. 本声明的解释、效力及争议解决适用中华人民共和国法律（不含港澳台地区法律）。
 2. 如本声明部分条款被认定为无效或不可执行，不影响其余条款的效力。
 3. 开发者保留随时修订本声明的权利，修订后的声明自发布之日起生效。
-
-# 截图展示
-
-<table>
-  <tr>
-    <td align="center"><img src="images/1.jpg" width="270"/><br/><sub>首页</sub></td>
-    <td align="center"><img src="images/2.jpg" width="270"/><br/><sub>播放页</sub></td>
-    <td align="center"><img src="images/3.jpg" width="270"/><br/><sub>历史页</sub></td>
-    <td align="center"><img src="images/4.jpg" width="270"/><br/><sub>设置页</sub></td>
-   </tr>
-</table>
-
-<p align="center">
-  <img src="images/5.jpg" alt="首页"/>
-  <br/><sub>宽屏首页</sub>
-<p align="center">
-  <img src="images/6.jpg" alt="首页"/>
-  <br/><sub>桌面端（仅支持 py 和 md5 格式的源）</sub>
-</p>
