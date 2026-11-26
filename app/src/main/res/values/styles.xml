@@ -17,5 +17,24 @@
         <item name="android:windowBackground">@color/window_background</item>
     </style>
 
-    <style name="AppTheme.Splash" parent="AppTheme.NoActionBar" />
+    <!-- 启动画面：白底，不画图标；品牌名由 MainActivity 的 BrandSplashOverlay 绘制。 -->
+    <style name="AppTheme.Splash" parent="AppTheme.NoActionBar">
+        <item name="android:windowBackground">@color/splash_background</item>
+    </style>
+
+    <!--
+      直播页 / 短剧页用：把系统默认的整屏横向滑动换成 170ms 交叉淡入。
+      原来点直播键时，直播页整屏（含它自己的底部导航）从右边滑进来盖住首页，
+      视觉上像换了一个 app；改成淡入后，切页更像同一套界面里换内容。
+    -->
+    <style name="AppTheme.NoActionBar.FadeIn" parent="AppTheme.NoActionBar">
+        <item name="android:windowAnimationStyle">@style/Animation.AppFade</item>
+    </style>
+
+    <style name="Animation.AppFade" parent="@android:style/Animation.Activity">
+        <item name="android:activityOpenEnterAnimation">@anim/activity_fade_in</item>
+        <item name="android:activityOpenExitAnimation">@anim/activity_hold</item>
+        <item name="android:activityCloseEnterAnimation">@anim/activity_hold</item>
+        <item name="android:activityCloseExitAnimation">@anim/activity_fade_out</item>
+    </style>
 </resources>

@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- 启动图标底色：取自图标四角的深紫黑，避免自适应图标裁切后露出白边。 -->
+    <color name="ic_launcher_background">#0B0A14</color>
 </resources>

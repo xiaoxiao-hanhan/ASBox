@@ -1,6 +1,8 @@
 package com.undcover.freedom.pyramid
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
 
 class PyToast {
@@ -33,15 +35,27 @@ class PyToast {
 
         @JvmStatic
         fun showCancelableToast(msg: String?, duration: Int) {
-            innerToast?.cancel()
-            val toast = Toast.makeText(mContext, msg, duration)
-            innerToast = toast
-            toast.show()
+            val ctx = mContext ?: return
+            Handler(Looper.getMainLooper()).post {
+                try {
+                    innerToast?.cancel()
+                    val toast = Toast.makeText(ctx, msg, duration)
+                    innerToast = toast
+                    toast.show()
+                } catch (ignored: Throwable) {
+                }
+            }
         }
 
         @JvmStatic
         fun showMessage(msg: String?, duration: Int) {
-            Toast.makeText(mContext, msg, duration).show()
+            val ctx = mContext ?: return
+            Handler(Looper.getMainLooper()).post {
+                try {
+                    Toast.makeText(ctx, msg, duration).show()
+                } catch (ignored: Throwable) {
+                }
+            }
         }
     }
 }

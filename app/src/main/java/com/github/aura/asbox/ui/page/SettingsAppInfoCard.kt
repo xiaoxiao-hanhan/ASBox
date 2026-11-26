@@ -1,0 +1,111 @@
+package com.github.aura.asbox.ui.page
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.github.aura.asbox.R
+
+private val HeaderCardShape = RoundedCornerShape(32.dp)
+
+private val VersionPillShape = RoundedCornerShape(24.dp)
+
+private val AppBadgeSize = 76.dp
+
+/** 与图标自带的圆角一致，避免图片四角被卡片底色描出直角。 */
+private val AppBadgeShape = RoundedCornerShape(18.dp)
+
+@Composable
+internal fun AppInfoHeaderCard(versionName: String) {
+    val scheme = MaterialTheme.colorScheme
+    val contentColor = scheme.onPrimaryContainer
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(HeaderCardShape)
+            .background(scheme.primaryContainer)
+            .padding(horizontal = 20.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // 应用图标换成品牌彩图：不能再走 Icon + tint，否则会被染成单色剪影。
+            Image(
+                painter = painterResource(R.drawable.ic_brand_logo),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(AppBadgeSize)
+                    .clip(AppBadgeShape),
+            )
+            Spacer(Modifier.width(20.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "AuraShadeBox",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = contentColor,
+                )
+                Text(
+                    text = stringResource(R.string.settings_app_tagline),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = contentColor.copy(alpha = 0.75f),
+                )
+            }
+        }
+        VersionPill(versionText = versionName.ifEmpty { "-" })
+    }
+}
+
+@Composable
+private fun VersionPill(versionText: String) {
+    val scheme = MaterialTheme.colorScheme
+    val contentColor = scheme.onPrimaryContainer
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(VersionPillShape)
+            .background(scheme.surfaceContainerLow)
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_play_decode),
+            contentDescription = null,
+            tint = contentColor,
+            modifier = Modifier.size(28.dp),
+        )
+        Spacer(Modifier.width(16.dp))
+        Column {
+            Text(
+                text = stringResource(R.string.settings_app_version),
+                style = MaterialTheme.typography.bodyMedium,
+                color = contentColor.copy(alpha = 0.75f),
+            )
+            Text(
+                text = versionText,
+                style = MaterialTheme.typography.titleLarge,
+                fontSize = 16.sp,
+                color = contentColor,
+            )
+        }
+    }
+}

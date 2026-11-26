@@ -64,7 +64,7 @@ def loadFromDisk(fileName):
     name = fileName.split('/')[-1].split('.')[0]
     spList = gParam['SpiderList']
     # 2026-09-12 改用 PEP 451 加载。原 SourceFileLoader(...).load_module() 有两个问题:
-    #   ① 该 API 在 CPython 3.12 已被移除(Chaquopy 可用 3.10~3.14,一旦升版本 Python 源会全线加载失败);
+    #   ① 该 API 在 CPython 3.12 已被移除(旧代码升版本后 Python 源会全线加载失败，现已改走 PEP 451，3.13 可用);
     #   ② 它会复用 sys.modules 里同一个 module 字典并重执行源码 —— 同文件被多源引用时模块级全局状态互相覆盖。
     # 现在每次加载都得到全新的 module 对象(命名空间隔离),并登记进 sys.modules 以保留 `import <名字>` 语义。
     spec = spec_from_file_location(name, fileName)

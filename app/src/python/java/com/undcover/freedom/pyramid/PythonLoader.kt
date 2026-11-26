@@ -11,9 +11,9 @@ import com.github.catvod.crawler.Spider
 import com.github.catvod.crawler.SpiderNull
 import com.github.catvod.crawler.SpiderReaper
 import com.github.catvod.net.OkHttp
-import com.github.avbox.osc.BuildConfig
-import com.github.avbox.osc.net.HttpClients
-import com.github.avbox.osc.util.AppLog
+import com.github.aura.asbox.BuildConfig
+import com.github.aura.asbox.net.HttpClients
+import com.github.aura.asbox.util.AppLog
 
 import org.json.JSONException
 import org.json.JSONObject
@@ -177,7 +177,7 @@ class PythonLoader {
                 }
             }
 
-            future.get(30, TimeUnit.SECONDS)
+            future.get(60, TimeUnit.SECONDS)
 
             if (startGeneration != generation) return SpiderNull()
             if (!spider.isLoadSuccess()) return SpiderNull()

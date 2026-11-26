@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 被盖住/被返回的页面保持不动，让上层页面淡入淡出，形成交叉淡入而不是黑屏闪一下。 -->
+<alpha xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="170"
+    android:fromAlpha="1.0"
+    android:interpolator="@android:interpolator/linear"
+    android:toAlpha="1.0" />

@@ -36,12 +36,12 @@ dependencies {
 
 chaquopy {
     defaultConfig {
-        version = "3.10"
+        version = "3.13"
         val explicitBuildPython = (project.findProperty("buildPython") as String?)
             ?: System.getenv("CHAQUOPY_BUILD_PYTHON")
         val defaultBuildPython = File(
             System.getProperty("user.home"),
-            "AppData/Local/Programs/Python/Python310/python.exe",
+            "AppData/Local/Programs/Python/Python313/python.exe",
         ).absolutePath
         listOfNotNull(explicitBuildPython, defaultBuildPython)
             .firstOrNull { file(it).exists() }
@@ -50,7 +50,6 @@ chaquopy {
             options("-i", "https://repo.huaweicloud.com/repository/pypi/simple/")
             options("--extra-index-url", "https://chaquo.com/pypi-13.1")
             install("lxml")
-            install("ujson")
             install("pyquery==2.0.2")
             install("requests")
             install(file("wheels/jsonpath-0.54-py3-none-any.whl").absolutePath)

@@ -6,6 +6,10 @@
 
     <color name="window_background">#F3EDF7</color>
 
+    <!-- 启动画面：纯白底 + 品牌名字，不再用应用图标（深色模式也用白底）。 -->
+    <color name="splash_background">#FFFFFF</color>
+    <color name="splash_brand_text">#1C1B1F</color>
+
     <color name="color_FFFFFF">#ffffffff</color>
     <color name="color_FFB6C1">#FFB6C1</color>
 </resources>

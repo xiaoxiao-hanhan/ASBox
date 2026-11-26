@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 直播页签图标：照 han 给的图——电视轮廓，屏内带 TV 字，下方一条底座横线。evenOdd 挖出屏幕内框，字母作为子路径落在框内即填充。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M168,190 h624 a60,60 0 0 1 60,60 v360 a60,60 0 0 1 -60,60 h-624 a60,60 0 0 1 -60,-60 v-360 a60,60 0 0 1 60,-60 Z M196,242 a36,36 0 0 0 -36,36 v304 a36,36 0 0 0 36,36 h568 a36,36 0 0 0 36,-36 v-304 a36,36 0 0 0 -36,-36 Z M245,340 h180 v56 h-62 v124 h-56 v-124 h-62 Z M485,340 h64 l51,108 51,-108 h64 l-90,180 h-50 Z M396,714 h168 a16,16 0 0 1 16,16 v0 a16,16 0 0 1 -16,16 h-168 a16,16 0 0 1 -16,-16 v0 a16,16 0 0 1 16,-16 Z" />
+</vector>

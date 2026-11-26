@@ -5,7 +5,7 @@
 # Date  : 2022/8/25
 # upDate  : 2022/11/17 支持 -- 剔除元素 多个剔除
 
-import ujson
+import json
 from pyquery import PyQuery as pq
 from urllib.parse import urljoin
 import re
@@ -222,7 +222,7 @@ class jsoup:
         if isinstance(html, str):
             # print(html)
             try:
-                html = ujson.loads(html)
+                html = json.loads(html)
                 # html = eval(html)
             except:
                 print('字符串转json失败')
@@ -251,7 +251,7 @@ class jsoup:
             return []
         if isinstance(html, str):
             try:
-                html = ujson.loads(html)
+                html = json.loads(html)
             except:
                 return []
         if not parse.startswith('$.'):

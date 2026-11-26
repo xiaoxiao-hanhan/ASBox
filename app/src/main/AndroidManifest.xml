@@ -70,7 +70,8 @@
 
         <activity
             android:name=".ui.LivePlayActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize" />
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
+            android:theme="@style/AppTheme.NoActionBar.FadeIn" />
         <activity
             android:name=".ui.DetailActivity"
             android:launchMode="singleTop"
@@ -105,6 +106,21 @@
             android:name=".ui.PlaySettingsActivity" />
         <activity
             android:name=".ui.PreferenceSettingsActivity" />
+        <activity
+            android:name=".ui.TmdbSettingsActivity" />
+        <activity
+            android:name=".ui.RecordsActivity" />
+        <activity
+            android:name=".ui.ShortDramaActivity"
+            android:theme="@style/AppTheme.NoActionBar.FadeIn" />
+        <activity
+            android:name=".ui.DanmuSettingsActivity" />
+        <activity
+            android:name=".ui.DanmuServiceActivity" />
+        <activity
+            android:name=".ui.DanmuColorActivity" />
+        <activity
+            android:name=".ui.DanmuFontActivity" />
 
         <service
             android:name=".dlna.DLNACastService"
