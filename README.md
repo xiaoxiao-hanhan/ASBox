@@ -35,7 +35,7 @@ APK 输出在 `app/build/outputs/apk/debug/`。
 
 ## 出处与许可证
 
-- 本项目基于 AVBox 二开，遵循 **AGPL-3.0** 开源协议（见 `LICENSE`）
+- 本项目基于 AVBox魔改，遵循 **AGPL-3.0** 开源协议（见 `LICENSE`）
 - 上游项目：
   - https://github.com/CatVodTVOfficial/TVBoxOSC
   - https://github.com/q215613905/TVBoxOS
