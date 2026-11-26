@@ -41,4 +41,4 @@ APK 输出在 `app/build/outputs/apk/debug/`。
   - https://github.com/q215613905/TVBoxOS
   - https://github.com/XiaochangXu/AVBox
 
-详细改动记录见 [`改动说明.md`](改动说明.md)。
+详细改动记录见 [`改动说明.md`]。
