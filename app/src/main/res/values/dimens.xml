@@ -1,4 +1,5 @@
 <resources>
+    <dimen name="ts_16">16mm</dimen>
     <dimen name="ts_18">18mm</dimen>
     <dimen name="ts_19">19mm</dimen>
     <dimen name="ts_20">20mm</dimen>
@@ -6,6 +7,7 @@
     <dimen name="ts_24">24mm</dimen>
     <dimen name="ts_26">26mm</dimen>
     <dimen name="ts_30">30mm</dimen>
+    <dimen name="ts_32">32mm</dimen>
 
     <dimen name="vs_2">2mm</dimen>
     <dimen name="vs_5">5mm</dimen>
@@ -16,10 +18,13 @@
     <dimen name="vs_20">20mm</dimen>
     <dimen name="vs_24">24mm</dimen>
     <dimen name="vs_30">30mm</dimen>
+    <dimen name="vs_36">36mm</dimen>
     <dimen name="vs_40">40mm</dimen>
     <dimen name="vs_50">50mm</dimen>
     <dimen name="vs_60">60mm</dimen>
     <dimen name="vs_70">70mm</dimen>
+    <dimen name="vs_90">90mm</dimen>
+    <dimen name="vs_100">100mm</dimen>
     <dimen name="vs_120">120mm</dimen>
     <dimen name="vs_140">140mm</dimen>
     <dimen name="vs_200">200mm</dimen>

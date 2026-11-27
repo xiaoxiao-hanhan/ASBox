@@ -152,6 +152,10 @@ class KVKeySpec : KVDecoder.TypeRegistry {
             })
             register(KVKeys.LIVE_API_LINE_LIST, object : TypeToken<ArrayList<String>>() {
             })
+            register(KVKeys.MULTI_REPO_SOURCES, object : TypeToken<ArrayList<String>>() {
+            })
+            register(KVKeys.MULTI_REPO_LIVE_SOURCES, object : TypeToken<ArrayList<String>>() {
+            })
             register(KVKeys.BOOT_LOADING_JAR, "")
             register(KVKeys.BOOT_LOADING_SCOPE, "")
             register(KVKeys.BOOT_SAFE_DISABLED, "")

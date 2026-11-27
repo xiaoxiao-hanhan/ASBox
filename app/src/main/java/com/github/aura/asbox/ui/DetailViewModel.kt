@@ -97,6 +97,9 @@ class DetailViewModel : ViewModel(), TmdbPosterCache {
     // 从短剧页进入时为 true：详情页播放区切短剧模式（红果风竖屏页、无收藏）。
     private val _shortDrama = MutableStateFlow(false)
     val shortDrama = _shortDrama.asStateFlow()
+    // 从短剧信息流跳过来且片源是竖屏：详情页首帧就按竖屏小窗排，避免先闪一下横屏窗口。
+    private val _dramaPortrait = MutableStateFlow(false)
+    val dramaPortrait = _dramaPortrait.asStateFlow()
     private val _rotating = MutableStateFlow(false)
     val rotating: StateFlow<Boolean> = _rotating.asStateFlow()
     private val _enteringFullscreen = MutableStateFlow(false)
@@ -105,6 +108,12 @@ class DetailViewModel : ViewModel(), TmdbPosterCache {
     val exitingFullscreen = _exitingFullscreen.asStateFlow()
     private val _playSignal = MutableStateFlow(0)
     val playSignal = _playSignal.asStateFlow()
+    /**
+     * 从短剧信息流「点击观看完整剧」进来（autoPlay）：页面一进来就直接摆播放壳，
+     * 不等详情接口回来才建播放容器——否则用户会先看到详情页再被切到播放窗口。
+     */
+    private val _directPlay = MutableStateFlow(false)
+    val directPlay = _directPlay.asStateFlow()
     private val _collected = MutableStateFlow(false)
     val collected = _collected.asStateFlow()
     private val _follow = MutableStateFlow<VodFollow?>(null)
@@ -323,6 +332,11 @@ class DetailViewModel : ViewModel(), TmdbPosterCache {
     private var vodName = ""
     private var vodPicture = ""
     private var fromCollect = false
+    private var preferredPlayFlag = ""
+    private var preferredPlayIndex = -1
+    /** 从短剧信息流「全屏观看」进来：详情就绪后自己开播并进全屏。 */
+    private var pendingAutoPlay = false
+    private var pendingOpenFullscreen = false
 
     val pendingPicture: String get() = vodPicture
 
@@ -453,6 +467,11 @@ class DetailViewModel : ViewModel(), TmdbPosterCache {
             picture = bundle.getString("picture", "").orEmpty(),
             fromCollect = bundle.getBoolean("collect", false),
             shortDrama = bundle.getBoolean("shortDrama", false),
+            playFlag = bundle.getString("playFlag").orEmpty(),
+            playIndex = bundle.getInt("playIndex", -1),
+            portraitDrama = bundle.getBoolean("portraitDrama", false),
+            autoPlay = bundle.getBoolean("autoPlay", false),
+            openFullscreen = bundle.getBoolean("openFullscreen", false),
         )
     }
 
@@ -463,6 +482,12 @@ class DetailViewModel : ViewModel(), TmdbPosterCache {
         sendCommand(PlaybackCommand.SetEpisodeSheetOpen(false))
         fromCollect = target.fromCollect
         _shortDrama.value = target.shortDrama
+        _dramaPortrait.value = target.portraitDrama
+        preferredPlayFlag = target.playFlag
+        preferredPlayIndex = target.playIndex
+        pendingAutoPlay = target.autoPlay
+        pendingOpenFullscreen = target.openFullscreen
+        _directPlay.value = target.autoPlay
         vodName = target.title
         vodPicture = target.picture
         loadDetail(target.vodId, target.sourceKey)
@@ -558,6 +583,17 @@ class DetailViewModel : ViewModel(), TmdbPosterCache {
         applySlideState(next)
     }
 
+    /**
+     * 直达全屏（从短剧信息流的「全屏观看」进来）：不进滑入动画、不经过小窗，
+     * 界面第一帧就是全屏播放器。
+     */
+    fun enterFullscreenInstant() {
+        _exitingFullscreen.value = false
+        _enteringFullscreen.value = false
+        _fullScreen.value = true
+        pendingOpenFullscreen = false
+    }
+
     fun onEntrySlideFinished() {
         val next = DetailFullScreenSlide.entryFinished(slideState()) ?: return
         applySlideState(next)
@@ -591,6 +627,7 @@ class DetailViewModel : ViewModel(), TmdbPosterCache {
     }
 
     fun showEpisodeSheet() {
+        if (_episodeSheet.value) return
         _episodeSheet.value = true
         sendCommand(PlaybackCommand.SetEpisodeSheetOpen(true))
     }
@@ -740,6 +777,16 @@ class DetailViewModel : ViewModel(), TmdbPosterCache {
                 }
                 val restored = restoredSelection(info)
                 info = info.copy(playFlag = restored.first, playIndex = restored.second)
+                // 短剧信息流点「观看完整剧」过来的：接着播刚才那一集，不要退回第一集。
+                if (preferredPlayFlag.isNotEmpty()) {
+                    val preferredList = info.seriesMap?.get(preferredPlayFlag)
+                    if (!preferredList.isNullOrEmpty()) {
+                        info = info.copy(
+                            playFlag = preferredPlayFlag,
+                            playIndex = preferredPlayIndex.coerceIn(0, preferredList.size - 1),
+                        )
+                    }
+                }
                 resetEngineState(keepChips = true)
                 val playingList = info.seriesMap?.get(info.playFlag)
                 if (!playingList.isNullOrEmpty()) {
@@ -753,6 +800,15 @@ class DetailViewModel : ViewModel(), TmdbPosterCache {
                 vodName = detailVideo.name ?: vodName
                 if (!playingList.isNullOrEmpty()) switchSnapshot = null
                 _pageState.value = PageState.Ready
+                // 短剧信息流「全屏观看」过来：详情一就绪就自己开播，并直接进老的横屏全屏。
+                if (pendingAutoPlay && !playingList.isNullOrEmpty()) {
+                    pendingAutoPlay = false
+                    _playSignal.value += 1
+                    if (pendingOpenFullscreen) {
+                        pendingOpenFullscreen = false
+                        enterFullscreen()
+                    }
+                }
                 bumpRevision()
                 if (playingList.isNullOrEmpty()) {
                     if (retryDetailOnce("no-line")) return@launch

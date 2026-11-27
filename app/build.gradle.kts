@@ -16,8 +16,8 @@ android {
         applicationId = "com.github.aura.asbox"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 34
-        versionName = "1.3.0"
+        versionCode = 36
+        versionName = "1.4.1"
         multiDexEnabled = true
         ndk {
             abiFilters += setOf("arm64-v8a")

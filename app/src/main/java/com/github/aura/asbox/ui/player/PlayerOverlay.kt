@@ -6,6 +6,7 @@ import android.util.TypedValue
 import androidx.annotation.DimenRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -31,6 +32,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.github.aura.asbox.R
 import com.github.aura.asbox.player.state.ParamsChoice
 import com.github.aura.asbox.player.state.PlayerActions
@@ -51,6 +54,37 @@ fun PlayerOverlay(
     onTapPending: () -> Unit,
 ) {
     val screenWidthPx = LocalContext.current.resources.displayMetrics.widthPixels
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        // 竖屏全屏时视频 View 为了铺满整屏做了左右裁切，实际宽度会大于屏幕宽度
+        // （1080 屏上可能是 1350），而播放器叠层是画在这个被裁切的 View 里的。
+        // 若不把叠层收回可见范围，最左/最右的功能键就会被屏幕边缘切掉。
+        val hostWidthPx = with(LocalDensity.current) { maxWidth.toPx().roundToInt() }
+        val clippedSidePx = ((hostWidthPx - screenWidthPx) / 2f).coerceAtLeast(0f).toInt()
+        val sidePadding = with(LocalDensity.current) { clippedSidePx.toDp() }
+        Box(Modifier.fillMaxSize().padding(horizontal = sidePadding)) {
+            PlayerOverlayContent(
+                state = state,
+                actions = actions,
+                decodeChoice = decodeChoice,
+                gestureHandler = gestureHandler,
+                gestureSession = gestureSession,
+                onTapPending = onTapPending,
+                screenWidthPx = screenWidthPx,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlayerOverlayContent(
+    state: PlayerUiState,
+    actions: PlayerActions,
+    decodeChoice: ParamsChoice,
+    gestureHandler: VideoGestureHandler,
+    gestureSession: (width: Int, height: Int, screenWidth: Int, downY: Float) -> VideoGestureSession,
+    onTapPending: () -> Unit,
+    screenWidthPx: Int,
+) {
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
@@ -83,9 +117,13 @@ fun PlayerOverlay(
         PlayerSlideVisibility(
             visible = !hostedChrome && state.controlsVisible,
             fromTop = false,
-            modifier = Modifier.align(Alignment.BottomCenter),
+            // 全屏时系统栏（底部导航键）透明悬浮在画面上，功能键整体往上挪一点点，
+            // 避免最底一排被手势条压住。只挪外层容器，功能键内部排布一律不动。
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 10.dp),
         ) {
-            PlayerBottomBar(state, actions)
+            PlayerBottomBar(state, actions, largeActions = true)
         }
         PlayerSlideHint(state)
         PlayerSeekHint(state)
@@ -108,10 +146,26 @@ fun PlayerOverlay(
         PlayerSpeedBoostHint(state)
 
         state.selectDialog?.let { dialogState ->
-            PlayerSelectDialog(
-                dialogState = dialogState,
-                onDismiss = state::dismissSelectDialog,
-            )
+            val onDismiss = state::dismissSelectDialog
+            if (state.previewMode) {
+                // 内嵌小窗（详情页/短剧）：弹窗原本画在播放器 View 内部的 ComposeView 里，
+                // 上面还盖着页面的切集手势层与顶部/底部控制条，点击选项的事件会被上层吞掉
+                // ——表现为「弹窗弹得出，但点哪个都没反应」。改用独立 Dialog 窗口渲染，
+                // 彻底脱离被拦截的 View 层级；透明全屏容器只负责占位，外观仍由 PlayerDialog 自己画。
+                Dialog(
+                    onDismissRequest = onDismiss,
+                    properties = DialogProperties(
+                        usePlatformDefaultWidth = false,
+                        decorFitsSystemWindows = false,
+                    ),
+                ) {
+                    Box(Modifier.fillMaxSize()) {
+                        PlayerSelectDialog(dialogState = dialogState, onDismiss = onDismiss)
+                    }
+                }
+            } else {
+                PlayerSelectDialog(dialogState = dialogState, onDismiss = onDismiss)
+            }
         }
 
         state.paramsSheet?.let { sheet ->
@@ -167,13 +221,25 @@ private const val PLAYER_DESIGN_WIDTH = 1280f
 @Composable
 private fun playerMmScale(): Float {
     val container = LocalWindowInfo.current.containerSize
-    val longEdgePx = if (container.width > 0 && container.height > 0) {
+    val portrait = container.height > container.width
+    // 横屏按长边缩放是原来的设计；竖屏（尤其短剧全屏 1080x2400）再按长边算，
+    // 图标会比屏宽还大。竖屏一律按「实际可见屏宽」缩放——视频 View 为铺满做了左右裁切，
+    // 它的宽度可能是 1350，不能直接拿来当 UI 宽度，否则功能键仍会被屏幕边缘切掉。
+    val refPx = if (portrait) {
+        val screenW = LocalContext.current.resources.displayMetrics.widthPixels
+        if (screenW > 0) {
+            screenW.toFloat()
+        } else {
+            val conf = LocalConfiguration.current
+            conf.screenWidthDp * LocalDensity.current.density
+        }
+    } else if (container.width > 0 && container.height > 0) {
         maxOf(container.width, container.height).toFloat()
     } else {
         val conf = LocalConfiguration.current
         maxOf(conf.screenWidthDp, conf.screenHeightDp) * LocalDensity.current.density
     }
-    return if (longEdgePx > 0f) longEdgePx / PLAYER_DESIGN_WIDTH else 1f
+    return if (refPx > 0f) refPx / PLAYER_DESIGN_WIDTH else 1f
 }
 
 private fun rawMm(resources: Resources, @DimenRes id: Int): Float? {

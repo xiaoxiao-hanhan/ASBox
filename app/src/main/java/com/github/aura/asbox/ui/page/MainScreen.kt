@@ -77,7 +77,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.aura.asbox.R
 import com.github.aura.asbox.server.ControlManager
 import com.github.aura.asbox.ui.LivePlayActivity
-import com.github.aura.asbox.ui.ShortDramaActivity
+import com.github.aura.asbox.ui.drama.DramaFeedActivity
 import com.github.aura.asbox.ui.components.AVBoxAlertDialog
 import com.github.aura.asbox.ui.components.LocalTopBarGlassPauseRecording
 import com.github.aura.asbox.ui.components.LocalSheetDismissThen
@@ -456,7 +456,7 @@ private fun MainContent() {
                             }
                             LiveChoiceItem(R.string.short_drama_title) {
                                 liveChoiceOpen = false
-                                context.startActivity(Intent(context, ShortDramaActivity::class.java))
+                                DramaFeedActivity.start(context)
                             }
                         }
                     },

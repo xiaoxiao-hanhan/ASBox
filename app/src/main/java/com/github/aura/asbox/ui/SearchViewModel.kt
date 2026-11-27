@@ -35,7 +35,11 @@ import kotlinx.coroutines.withTimeoutOrNull
 import com.github.aura.asbox.data.AppGraph
 import com.github.aura.asbox.ui.components.toVodInfo
 
-class SearchViewModel(initialTitle: String? = null) : ViewModel(), TmdbPosterCache {
+class SearchViewModel(
+    initialTitle: String? = null,
+    /** 只看这一个源：短剧播放器等场景从外部指定，忽略「搜索源」勾选。 */
+    private val siteKey: String? = null,
+) : ViewModel(), TmdbPosterCache {
 
     override fun tmdbCachedPoster(name: String?, year: Int, altName: String?): String? =
         TmdbPoster.cachedPoster(name, year, altName)
@@ -255,7 +259,13 @@ class SearchViewModel(initialTitle: String? = null) : ViewModel(), TmdbPosterCac
         val home = ApiConfig.get().homeSourceBean()
         val picked = SearchSourcesState.state.value.pickedKeys
         val sources = ApiConfig.get().getSourceBeanList()
-            .filter { it.isSearchable() && picked.contains(it.key) }
+            .filter {
+                if (!siteKey.isNullOrEmpty()) {
+                    it.key == siteKey && it.isSearchable()
+                } else {
+                    it.isSearchable() && picked.contains(it.key)
+                }
+            }
             .sortedBy { it.key != home.key }
         arriveSeq = 0
         _results.value = sources.map { SourceResult(it.key.orEmpty(), it.name.orEmpty(), ResultState.Pending, emptyList()) }

@@ -51,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -111,6 +112,7 @@ fun ConfigManageScreen(onNavigateBack: () -> Unit) {
     val toastEvent by vm.toastEvent.collectAsState()
     val localItems by vm.localItems.collectAsState()
     val localEnabled by vm.localEnabled.collectAsState()
+    val multiRepoUrls by vm.multiRepoUrls.collectAsState()
 
     val isVod = mode == ConfigMode.Vod
     val currentItems = when {
@@ -133,14 +135,6 @@ fun ConfigManageScreen(onNavigateBack: () -> Unit) {
     }
 
     BackHandler(enabled = manageMode) { vm.exitManageMode() }
-
-    val canSwitchRepo = if (isVod) {
-        HistoryHelper.isApiLineUrl(activeUrl)
-    } else if (mode == ConfigMode.Live) {
-        ApiConfig.get().isLiveApiLineMode() && HistoryHelper.isLiveApiLineUrl(liveActiveUrl)
-    } else {
-        false
-    }
 
     val repoEntries = if (isVod) HistoryHelper.getApiLines() else HistoryHelper.liveApiLines()
 
@@ -189,6 +183,8 @@ fun ConfigManageScreen(onNavigateBack: () -> Unit) {
         )
     }
     AppTopBarScaffold(
+        // 标题栏和三个页签固定住：列表往上滑时不跟着收起／上移（原来默认是滚动折叠）。
+        collapseEnabled = false,
         titleContent = {
             Text(
                 text = stringResource(R.string.settings_config_manage),
@@ -246,13 +242,7 @@ fun ConfigManageScreen(onNavigateBack: () -> Unit) {
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        if (canSwitchRepo) {
-                            TopBarActionBox(
-                                iconRes = R.drawable.ic_switch_repo,
-                                contentDescription = stringResource(R.string.config_switch_repo),
-                                onClick = { repoSheetOpen = true },
-                            )
-                        }
+                        // 多仓换源入口已移到「源名字」上（点名字直接换接口源），顶栏不再放图标。
                         if (mode == ConfigMode.Source) {
                             TopBarActionBox(
                                 iconRes = R.drawable.ic_file_choose,
@@ -461,6 +451,17 @@ fun ConfigManageScreen(onNavigateBack: () -> Unit) {
                                         HistoryHelper.isLiveApiLineSourceOf(item.url, liveActiveUrl)
                                     )
                             }
+                            val isMultiRepo = item.url in multiRepoUrls
+                            // 多仓源当前用的是哪条线路（只有它自己是那批线路的来源时才知道）。
+                            val lineName = if (isMultiRepo) {
+                                HistoryHelper.currentApiLineName(
+                                    item.url,
+                                    if (vodMode) activeUrl else liveActiveUrl,
+                                    !vodMode,
+                                )
+                            } else {
+                                ""
+                            }
                             SubscribeCard(
                                 modifier = Modifier.animateItem(),
                                 item = item,
@@ -468,6 +469,21 @@ fun ConfigManageScreen(onNavigateBack: () -> Unit) {
                                 disabled = item.url in disabledUrls,
                                 manageMode = manageMode,
                                 selected = value in selected,
+                                multiRepo = isMultiRepo,
+                                lineName = lineName,
+                                // 多仓源：点名字换接口源。正在用的是直接开面板；
+                                // 没在用的先切过去（切过去就会加载它的线路），避免点了没反应。
+                                onNameClick = if (isMultiRepo && !manageMode) {
+                                    {
+                                        if (inUse && repoEntries.isNotEmpty()) {
+                                            repoSheetOpen = true
+                                        } else {
+                                            vm.requestSwitch(item, vodMode)
+                                        }
+                                    }
+                                } else {
+                                    null
+                                },
                                 onClick = {
                                     if (manageMode) {
                                         vm.toggleSelected(value)
@@ -479,11 +495,8 @@ fun ConfigManageScreen(onNavigateBack: () -> Unit) {
                                     vm.longPressSelect(value)
                                 },
                                 onCheckedChange = { checked ->
-                                    if (checked) {
-                                        vm.requestSwitch(item, vodMode)
-                                    } else if (!vodMode) {
-                                        vm.followLiveNow()
-                                    }
+                                    // 开关就是「启用 / 停用」，只有一个源时也能随便开关。
+                                    vm.setSourceEnabled(item, vodMode, checked)
                                 },
                             )
                         }
@@ -600,7 +613,7 @@ private fun RepoSwitchSheet(
                         trailing = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 if (url in disabledUrls) {
-                                    DisabledSourceTag()
+                                    SourceTag(stringResource(R.string.config_source_disabled_tag))
                                     Spacer(Modifier.width(8.dp))
                                 }
                                 Text(
@@ -649,6 +662,9 @@ private fun SubscribeCard(
     selected: Boolean,
     modifier: Modifier = Modifier,
     showUrl: Boolean = true,
+    multiRepo: Boolean = false,
+    lineName: String = "",
+    onNameClick: (() -> Unit)? = null,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onCheckedChange: (Boolean) -> Unit,
@@ -670,17 +686,41 @@ private fun SubscribeCard(
             RowLeadingIcon(R.drawable.ic_subscribe_source, enabled = true)
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = item.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
+                    // 名字 + 下拉箭头整块可点（不只是文字那几个像素），多仓时点它换接口源。
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .clip(RoundedCornerShape(10.dp))
+                            .then(
+                                if (onNameClick != null) {
+                                    Modifier.clickable(onClick = onNameClick)
+                                } else {
+                                    Modifier
+                                }
+                            ),
+                    ) {
+                        Text(
+                            text = item.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (onNameClick != null) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_arrow_down),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .padding(start = 2.dp)
+                                    .size(16.dp),
+                            )
+                        }
+                    }
                     if (disabled) {
                         Spacer(Modifier.width(8.dp))
-                        DisabledSourceTag()
+                        SourceTag(stringResource(R.string.config_source_disabled_tag))
                     }
                 }
                 if (showUrl) {
@@ -692,6 +732,37 @@ private fun SubscribeCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                }
+                // 多仓源：源地址下面并排两个小标签——「多仓」+「使用源:当前线路」，
+                // 整块和名字一样可点（点了开换仓面板 / 切到这个源）。
+                if (multiRepo) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .then(
+                                if (onNameClick != null) {
+                                    Modifier.clickable(onClick = onNameClick)
+                                } else {
+                                    Modifier
+                                }
+                            ),
+                    ) {
+                        SourceChip(
+                            text = stringResource(R.string.config_multi_repo_tag),
+                            container = MultiRepoChipColor,
+                            content = Color.White,
+                        )
+                        if (lineName.isNotEmpty()) {
+                            SourceChip(
+                                text = stringResource(R.string.config_source_in_use, lineName),
+                                container = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                content = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
                 }
             }
             Spacer(Modifier.width(12.dp))
@@ -714,14 +785,34 @@ private fun SubscribeCard(
     }
 }
 
+/** 「多仓」标签的底色（用户示意图里画的蓝）。 */
+private val MultiRepoChipColor = Color(0xFF3DA2FF)
+
+/** 源地址下面的小标签：多仓 / 使用源:xxx，圆角胶囊，白字或深字都行。 */
 @Composable
-private fun DisabledSourceTag() {
+private fun SourceChip(text: String, container: Color, content: Color) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = container,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            color = content,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+        )
+    }
+}
+
+@Composable
+private fun SourceTag(text: String) {
     Surface(
         shape = RoundedCornerShape(6.dp),
         color = MaterialTheme.colorScheme.errorContainer,
     ) {
         Text(
-            text = stringResource(R.string.config_source_disabled_tag),
+            text = text,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onErrorContainer,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),

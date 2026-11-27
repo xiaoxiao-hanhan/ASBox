@@ -1,5 +1,7 @@
 package com.github.aura.asbox.ui.page
 
+import android.net.Uri
+import android.os.Environment
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
@@ -10,6 +12,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.github.aura.asbox.R
 import com.github.aura.asbox.api.AppBootstrap
 import com.github.aura.asbox.api.ApiConfig
+import com.github.aura.asbox.api.ConfigParser
 import com.github.aura.asbox.api.ConfigRepository
 import com.github.aura.asbox.io.LocalMergedConfig
 import com.github.aura.asbox.io.removeLocalCopy
@@ -21,6 +24,7 @@ import com.github.aura.asbox.util.HistoryHelper
 import com.github.aura.asbox.util.KV
 import com.github.aura.asbox.util.AppLog
 import com.github.aura.asbox.util.LanguageManager
+import com.github.aura.asbox.util.MD5
 import com.github.aura.asbox.api.TmdbApi
 import com.github.aura.asbox.api.TmdbPoster
 import kotlinx.coroutines.CancellationException
@@ -32,6 +36,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 data class SubscribeSource(val name: String, val url: String)
 
@@ -118,6 +123,11 @@ class ConfigManageViewModel(
     val localItems = _localItems.asStateFlow()
     private val _localEnabled = MutableStateFlow(loadLocalEnabled())
     val localEnabled = _localEnabled.asStateFlow()
+
+    /** 已确认是多仓（配置里带 urls 线路列表）的源地址，界面打「多仓」标记 + 允许点名字换源。 */
+    private val _multiRepoUrls = MutableStateFlow<Set<String>>(emptySet())
+    val multiRepoUrls = _multiRepoUrls.asStateFlow()
+
     private val _activeUrl = MutableStateFlow(KV.get(KVKeys.API_URL, ""))
     val activeUrl = _activeUrl.asStateFlow()
     private val _liveActiveUrl = MutableStateFlow(KV.get(KVKeys.LIVE_API_URL, ""))
@@ -156,6 +166,77 @@ class ConfigManageViewModel(
             AppBootstrap.state.collect { boot ->
                 if (boot is AppBootstrap.Boot.Ready) refreshActiveSnapshot()
             }
+        }
+        refreshMultiRepoMarks()
+    }
+
+    /**
+     * 识别哪些源是多仓：先看已记录的标记；没标记的读一次配置（下载缓存 / 本地文件），
+     * 里面带 urls 线路列表的就是多仓（顺手存标记，下次直接命中）。
+     * 这样即使源已经被停用、根本不会再加载，也能亮出「多仓」。
+     */
+    fun refreshMultiRepoMarks() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val found = HashSet<String>()
+            val groups = listOf(_vodItems.value to false, _liveItems.value to true)
+            for ((rawItems, live) in groups) {
+                for (raw in rawItems) {
+                    val url = parseSubscribe(raw).url
+                    if (url.isEmpty()) continue
+                    if (HistoryHelper.isMultiRepoSource(url, live)) {
+                        found.add(url)
+                        continue
+                    }
+                    if (configIsDepot(url)) {
+                        HistoryHelper.markMultiRepoSource(url, live)
+                        found.add(url)
+                    }
+                }
+            }
+            _multiRepoUrls.value = found
+        }
+    }
+
+    /** 读这个源的配置（先看下载缓存，再看本地文件），判断是不是多仓（带 urls 线路列表）。 */
+    private fun configIsDepot(url: String): Boolean {
+        val json = readConfigText(url) ?: return false
+        return try {
+            ConfigParser.parseApiCollection(json).isNotEmpty()
+        } catch (ignored: Throwable) {
+            false
+        }
+    }
+
+    private fun readConfigText(url: String): String? {
+        return try {
+            val app = AppContextHolder.context()
+            if (app != null) {
+                val cache = File(app.filesDir.absolutePath + "/" + MD5.encode(url))
+                if (cache.exists() && cache.length() > 0L) return cache.readText()
+            }
+            val local = localConfigFile(url)
+            if (local != null && local.exists() && local.length() > 0L) return local.readText()
+            null
+        } catch (ignored: Throwable) {
+            null
+        }
+    }
+
+    /** clan://localhost/… 、file://… 这类本地源地址换算成本机文件。 */
+    private fun localConfigFile(url: String): File? {
+        var raw = url
+        val cut = raw.indexOf(";md5;").takeIf { it >= 0 } ?: raw.indexOf(";pk;").takeIf { it >= 0 }
+        if (cut != null && cut >= 0) raw = raw.substring(0, cut)
+        val query = raw.indexOf('?')
+        if (query >= 0) raw = raw.substring(0, query)
+        return when {
+            raw.startsWith("clan://localhost/") -> File(
+                Environment.getExternalStorageDirectory().absolutePath + "/" +
+                    Uri.decode(raw.removePrefix("clan://localhost/"))
+            )
+            raw.startsWith("file://") -> File(Uri.decode(raw.removePrefix("file://")))
+            raw.startsWith("/") -> File(raw)
+            else -> null
         }
     }
 
@@ -298,6 +379,8 @@ class ConfigManageViewModel(
         _activeUrl.value = KV.get(KVKeys.API_URL, "")
         _liveActiveUrl.value = KV.get(KVKeys.LIVE_API_URL, "")
         _liveFollow.value = ApiConfig.isLiveFollowVod()
+        // 切换源、加载完配置后重新识别一次多仓标记（新源第一次加载时就地补标记）。
+        refreshMultiRepoMarks()
     }
 
     fun openEdit(target: SubscribeSource?) {
@@ -398,6 +481,41 @@ class ConfigManageViewModel(
         _liveActiveUrl.value = ""
         _liveFollow.value = true
         _toastEvent.value = str(R.string.toast_live_follow_vod)
+    }
+
+    /**
+     * 点播／直播列表里的开关：开 = 启用并切到它；关 = 停用这个源。
+     * 只有一个源时同样可以关（用户要求开关随便开关），关掉后应用就是「没有可用源」的状态；
+     * 如果关的正是当前在用的源，先退到同列表里其它还启用的源，没有再退到空／跟着点播。
+     */
+    fun setSourceEnabled(item: SubscribeSource, vod: Boolean, enabled: Boolean) {
+        if (enabled) {
+            if (item.url in _disabledUrls.value) {
+                BootGuard.enableSource(item.url)
+                _disabledUrls.value = _disabledUrls.value - item.url
+            }
+            if (vod) switchToVod(item) else switchToLive(item)
+            return
+        }
+        BootGuard.disableSource(item.url)
+        _disabledUrls.value = _disabledUrls.value + item.url
+        if (!isInUse(item.url, vod)) return
+        val next = (if (vod) _vodItems.value else _liveItems.value)
+            .map { parseSubscribe(it) }
+            .firstOrNull { it.url != item.url && it.url !in _disabledUrls.value }
+        when {
+            vod && next != null -> switchToVod(next)
+            vod -> clearActiveVod()
+            next != null -> switchToLive(next)
+            else -> followLiveNow()
+        }
+    }
+
+    /** 停用了当前在用的点播源、且没有别的可用源：清空点播配置，首页回到无源状态。 */
+    private fun clearActiveVod() {
+        ApiConfig.get().clearVodConfig()
+        _activeUrl.value = ""
+        AppBootstrap.retry()
     }
 
     /**

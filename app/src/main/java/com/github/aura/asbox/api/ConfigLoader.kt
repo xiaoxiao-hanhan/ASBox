@@ -435,8 +435,11 @@ class ConfigLoader(private val owner: ApiConfig) {
     private fun switchApiCollectionIfNeeded(apiUrl: String, jsonStr: String): Boolean {
         val apiLines = ConfigParser.parseApiCollection(jsonStr)
         if (apiLines.isEmpty()) {
+            // 这次加载出来的是单仓配置，之前若被记成多仓就抹掉标记。
+            HistoryHelper.clearMultiRepoSource(apiUrl, false)
             return false
         }
+        HistoryHelper.markMultiRepoSource(apiUrl, false)
         val firstApi = firstUsableApiLine(apiLines)
         if (TextUtils.isEmpty(firstApi) || firstApi == apiUrl) {
             return false
@@ -459,8 +462,10 @@ class ConfigLoader(private val owner: ApiConfig) {
     private fun switchLiveApiCollectionIfNeeded(apiUrl: String, jsonStr: String): Boolean {
         val apiLines = ConfigParser.parseApiCollection(jsonStr)
         if (apiLines.isEmpty()) {
+            HistoryHelper.clearMultiRepoSource(apiUrl, true)
             return false
         }
+        HistoryHelper.markMultiRepoSource(apiUrl, true)
         val firstApi = firstUsableApiLine(apiLines)
         if (TextUtils.isEmpty(firstApi) || firstApi == apiUrl) {
             return false

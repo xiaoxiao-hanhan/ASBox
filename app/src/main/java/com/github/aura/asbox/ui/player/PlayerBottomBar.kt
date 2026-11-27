@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -68,6 +69,9 @@ private val SeekThumbRadius = 6.dp
 
 private val SeekThumbRadiusActive = 9.dp
 
+/** 进度条两侧时间文字的固定宽度：左右等宽，进度条才正好居中。 */
+private val SeekTimeLabelWidth = 48.dp
+
 // 诊断用：上一次实际绘制的进度比例，仅用于避免重复打印
 private var lastDrawnProgress = Float.NaN
 
@@ -84,10 +88,16 @@ fun PlayerBottomBar(
     transparentTop: Boolean = false,
     /** 回传「进度条那一块」的高度（不含上面透明的几行），画面据此决定下沿。 */
     onBottomBlockHeight: ((Int) -> Unit)? = null,
+    /** 全屏播放器放大档；仅竖屏生效，横屏按长边换算本就偏大，保持原尺寸。 */
+    largeActions: Boolean = false,
 ) {
     val edge = playerEdgePadding()
     val configuration = LocalConfiguration.current
     val portraitActions = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+    // 放大档只在竖屏生效：横屏按长边（2400）换算比例约 1.875，是竖屏的 2.2 倍。
+    // 横屏用专门的紧凑档（50mm/36mm），比原来的 70mm/50mm 再缩约 0.7 倍。
+    val large = portraitActions && (largeActions || deckMode)
+    val landscape = !portraitActions
     val compactSeek = state.previewMode || deckMode
     val bottomPad = if (deckMode) {
         10.dp
@@ -148,8 +158,17 @@ fun PlayerBottomBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 8.dp),
-                size = if (state.previewMode) TopBarActionSize else playerDim(R.dimen.vs_70),
-                iconSize = if (state.previewMode) TopBarActionIconSize else playerDim(R.dimen.vs_50),
+                // 放大档优先：预览态原本固定用 42.dp/28.dp，会把放大效果整个吃掉。
+                size = if (state.previewMode && !large) {
+                    TopBarActionSize
+                } else {
+                    playerDim(if (large) R.dimen.vs_120 else R.dimen.vs_70)
+                },
+                iconSize = if (state.previewMode && !large) {
+                    TopBarActionIconSize
+                } else {
+                    playerDim(if (large) R.dimen.vs_100 else R.dimen.vs_50)
+                },
                 spread = true,
             )
         }
@@ -176,14 +195,19 @@ fun PlayerBottomBar(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(end = if (state.previewMode && !deckMode) 44.dp else 0.dp),
+                // 左右留白对称，进度条才在整行水平居中（预览态原来单侧留 44dp 会把它推偏）。
+                modifier = Modifier.padding(
+                    horizontal = if (state.previewMode && !deckMode) 22.dp else 0.dp,
+                ),
             ) {
+                // 这一排不再放播放按钮：下排播放控制里已有播放/暂停，
+                // 这里再放一个既重复又把进度条挤向右侧。
                 if (compactSeek) {
-                    PreviewPlayPauseButton(state, actions)
-                }
-
-                if (compactSeek) {
-                    CurrentTimeText(state)
+                    CurrentTimeText(
+                        state = state,
+                        modifier = Modifier.width(SeekTimeLabelWidth),
+                        textAlign = TextAlign.Center,
+                    )
                 }
                 PlayerSeekRow(
                     state = state,
@@ -199,7 +223,8 @@ fun PlayerBottomBar(
                         fontSize = playerTextSize(R.dimen.ts_20),
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
-                        modifier = Modifier.widthIn(min = 48.dp),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.width(SeekTimeLabelWidth),
                     )
                 }
             }
@@ -209,6 +234,8 @@ fun PlayerBottomBar(
                     state = state,
                     actions = actions,
                     modifier = Modifier.padding(top = 6.dp),
+                    large = large,
+                    landscape = landscape,
                 )
             }
 
@@ -249,14 +276,26 @@ private fun PlayerActionRow(
     state: PlayerUiState,
     actions: PlayerActions,
     modifier: Modifier = Modifier,
+    large: Boolean = false,
+    landscape: Boolean = false,
 ) {
-    val actionBox = playerDim(R.dimen.vs_70)
-    val actionIcon = playerDim(R.dimen.vs_50)
+    val actionBox = playerDim(
+        if (large) R.dimen.vs_120 else if (landscape) R.dimen.vs_50 else R.dimen.vs_70,
+    )
+    val actionIcon = playerDim(
+        if (large) R.dimen.vs_100 else if (landscape) R.dimen.vs_36 else R.dimen.vs_50,
+    )
     Row(
         modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        PlayerTransportRow(state = state, actions = actions, modifier = Modifier.weight(1f))
+        PlayerTransportRow(
+            state = state,
+            actions = actions,
+            modifier = Modifier.weight(1f),
+            large = large,
+            landscape = landscape,
+        )
         Row(
             horizontalArrangement = Arrangement.spacedBy(playerDim(R.dimen.vs_12)),
             verticalAlignment = Alignment.CenterVertically,
@@ -290,9 +329,13 @@ private fun PlayerTransportRow(
     state: PlayerUiState,
     actions: PlayerActions,
     modifier: Modifier = Modifier,
+    large: Boolean = false,
+    landscape: Boolean = false,
 ) {
     val gap = playerDim(R.dimen.vs_12)
-    val preferred = playerDim(R.dimen.vs_70)
+    val preferred = playerDim(
+        if (large) R.dimen.vs_120 else if (landscape) R.dimen.vs_50 else R.dimen.vs_70,
+    )
     BoxWithConstraints(modifier) {
         val box = minOf(preferred, (maxWidth - gap * (TRANSPORT_COUNT - 1)) / TRANSPORT_COUNT)
             .coerceAtLeast(1.dp)
@@ -397,14 +440,18 @@ private fun TimeRangeText(state: PlayerUiState) {
 }
 
 @Composable
-internal fun CurrentTimeText(state: PlayerUiState, modifier: Modifier = Modifier) {
+internal fun CurrentTimeText(
+    state: PlayerUiState,
+    modifier: Modifier = Modifier,
+    textAlign: TextAlign = TextAlign.End,
+) {
     Text(
         text = stringForTime(state.seekPreviewOrPosition),
         color = Color.White,
         fontSize = playerTextSize(R.dimen.ts_20),
         fontWeight = FontWeight.Medium,
         maxLines = 1,
-        textAlign = TextAlign.End,
+        textAlign = textAlign,
         modifier = modifier.widthIn(min = 48.dp),
     )
 }

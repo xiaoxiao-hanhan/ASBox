@@ -197,6 +197,11 @@ internal class PlayerConfigDelegate(private val host: VideoPlayerController) {
         host.listener?.updatePlayerCfg { it.put("sp", value.toDouble()) }
         host.state.updateSpeedOld(value)
         host.videoView?.setSpeed(value)
+        // BasePlayerView.setSpeed 只在播放态下发；短剧切集/起播/解析中点倍速时
+        // 此刻往往不在播放态，这一帧会被静默丢弃。接上就绪重试，等进入播放态后
+        // 再从配置里读 sp 下发，保证倍速真正生效（普通播放器同样受益）。
+        speedRetryCount = 0
+        applySpeedWhenReady()
     }
 
     fun applyScale(index: Int) {
@@ -292,18 +297,24 @@ internal class PlayerConfigDelegate(private val host: VideoPlayerController) {
     }
 
     fun showSpeedDialog() {
-        try {
-            val cfg = host.playerConfig ?: return
-            val speed = cfg.getDouble("sp").toFloat()
-            val speeds = speedOptions.map { "${it}x" }
-            host.state.openSelectDialog(SelectDialogState(
-                tip = host.context.getString(R.string.player_select_speed),
-                items = speeds,
-                defaultIndex = speedIndex(speed),
-                onSelected = { index -> applySpeed(speedOptions[index]) },
-            ))
-        } catch (e: JSONException) {
-            AppLog.e("VideoPlayerController", e)
+        // 倍速弹窗必须「点了就弹」。原来这里 playerConfig 未就绪时直接 return、
+        // 或配置里没有 sp 键抛 JSONException 被吞掉，表现就是点了倍速没反应。
+        // 改为优先用 state.speedOld（起播即有价值），配置只读一次且失败也能兜底。
+        var speed = host.state.speedOld
+        val cfg = host.playerConfig
+        if (cfg != null && cfg.has("sp")) {
+            try {
+                speed = cfg.getDouble("sp").toFloat()
+            } catch (e: JSONException) {
+                AppLog.e("VideoPlayerController", e)
+            }
         }
+        val speeds = speedOptions.map { "${it}x" }
+        host.state.openSelectDialog(SelectDialogState(
+            tip = host.context.getString(R.string.player_select_speed),
+            items = speeds,
+            defaultIndex = speedIndex(speed),
+            onSelected = { index -> applySpeed(speedOptions[index]) },
+        ))
     }
 }

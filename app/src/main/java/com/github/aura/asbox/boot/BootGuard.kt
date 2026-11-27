@@ -16,6 +16,8 @@ import com.github.aura.asbox.util.AppLog
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.PrintWriter
+import java.io.StringWriter
 import java.nio.charset.StandardCharsets
 import java.util.ArrayList
 
@@ -46,16 +48,54 @@ object BootGuard {
 
     private const val MAX_THROWABLE_CHAIN = 32
 
+    private const val CRASH_STACK_NAME = "last_crash_stack.txt"
+
     @JvmStatic
     fun install() {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            // 任何未捕获异常都先落盘完整堆栈，方便实机复现后直接定位，不再靠猜。
+            writeCrashStack(throwable)
             if (looksSourceRelatedSafely(throwable)) {
                 writeCrashMarker()
             } else {
                 AppLog.i("echo-boot-guard: crash unrelated to source, marker skipped")
             }
             if (previous != null) previous.uncaughtException(thread, throwable)
+        }
+    }
+
+    private fun writeCrashStack(throwable: Throwable) {
+        try {
+            val ctx = AppContextHolder.context() ?: return
+            val file = File(ctx.filesDir, CRASH_STACK_NAME)
+            val sw = StringWriter()
+            val pw = PrintWriter(sw)
+            pw.println("thread=" + Thread.currentThread().name)
+            throwable.printStackTrace(pw)
+            pw.flush()
+            FileOutputStream(file).use { out ->
+                out.write(sw.toString().toByteArray(StandardCharsets.UTF_8))
+                out.flush()
+            }
+        } catch (ignored: Throwable) {
+        }
+    }
+
+    /** 取出并清空最近一次崩溃堆栈；没有则返回空串。 */
+    @JvmStatic
+    fun takeCrashStack(): String {
+        try {
+            val ctx = AppContextHolder.context() ?: return ""
+            val file = File(ctx.filesDir, CRASH_STACK_NAME)
+            if (!file.exists()) return ""
+            val text = FileInputStream(file).use { input ->
+                String(input.readBytes(), StandardCharsets.UTF_8)
+            }
+            file.delete()
+            return text
+        } catch (e: Throwable) {
+            return ""
         }
     }
 
@@ -364,6 +404,19 @@ object BootGuard {
         try {
             KV.put(KVKeys.BOOT_DISABLED_SOURCES, removeDisabledSource(disabledSources(), url))
             KV.put(KVKeys.BOOT_DISABLED_JARS, removeDisabledJar(disabledJarEntries(), url))
+        } catch (ignored: Throwable) {
+        }
+    }
+
+    /**
+     * 用户在配置管理里手动关掉的源：走进同一个「停用」集合。
+     * 只有一个源时也允许停用（用户要求开关可以随意开关），下次启动同样会被跳过。
+     */
+    @JvmStatic
+    fun disableSource(url: String?) {
+        if (isEmpty(url)) return
+        try {
+            KV.put(KVKeys.BOOT_DISABLED_SOURCES, addDisabledSource(disabledSources(), url))
         } catch (ignored: Throwable) {
         }
     }

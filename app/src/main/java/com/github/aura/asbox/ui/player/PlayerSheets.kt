@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -194,6 +195,7 @@ internal fun SheetTitle(text: String) {
         text = text,
         color = MaterialTheme.colorScheme.onSurface,
         fontSize = playerTextSize(R.dimen.ts_26),
+        lineHeight = playerTextSize(R.dimen.ts_26),
         fontWeight = FontWeight.Medium,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
@@ -213,7 +215,11 @@ internal fun SheetButton(
     contentPadding: Dp = 0.dp,
     @DrawableRes iconRes: Int? = null,
     onPressChange: ((Boolean) -> Unit)? = null,
+    large: Boolean = false,
 ) {
+    val textSizeRes = if (large) R.dimen.ts_26 else R.dimen.ts_20
+    val minHeightRes = if (large) R.dimen.vs_50 else R.dimen.vs_40
+    val iconSizeRes = if (large) R.dimen.vs_30 else R.dimen.vs_24
     val container = if (selected) {
         MaterialTheme.colorScheme.primaryContainer
     } else {
@@ -238,7 +244,7 @@ internal fun SheetButton(
             )
         }
         .padding(horizontal = contentPadding)
-        .height(playerDim(R.dimen.vs_40))
+        .heightIn(min = playerDim(minHeightRes))
     Box(modifier = rowModifier, contentAlignment = Alignment.Center) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (iconRes != null) {
@@ -246,14 +252,15 @@ internal fun SheetButton(
                     painter = painterResource(iconRes),
                     contentDescription = null,
                     tint = contentColor,
-                    modifier = Modifier.size(playerDim(R.dimen.vs_24)),
+                    modifier = Modifier.size(playerDim(iconSizeRes)),
                 )
                 Spacer(Modifier.width(playerDim(R.dimen.vs_8)))
             }
             Text(
                 text = text,
                 color = contentColor,
-                fontSize = playerTextSize(R.dimen.ts_20),
+                fontSize = playerTextSize(textSizeRes),
+                lineHeight = playerTextSize(textSizeRes),
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -282,6 +289,7 @@ internal fun SheetTextAction(
             text = text,
             color = MaterialTheme.colorScheme.primary,
             fontSize = playerTextSize(fontSizeRes),
+            lineHeight = playerTextSize(fontSizeRes),
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -318,6 +326,7 @@ internal fun SheetActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     @DrawableRes iconRes: Int? = null,
+    large: Boolean = false,
 ) {
     var flashing by remember { mutableStateOf(false) }
     LaunchedEffect(flashing) {
@@ -335,6 +344,7 @@ internal fun SheetActionButton(
             onClick()
         },
         modifier = modifier,
+        large = large,
     )
 }
 
@@ -350,6 +360,7 @@ internal fun SheetLabelRow(label: String, content: @Composable RowScope.() -> Un
             text = label,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = playerTextSize(R.dimen.ts_20),
+            lineHeight = playerTextSize(R.dimen.ts_20),
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.End,
             modifier = Modifier.width(playerDim(R.dimen.vs_120)),
@@ -358,7 +369,7 @@ internal fun SheetLabelRow(label: String, content: @Composable RowScope.() -> Un
             Modifier
                 .weight(1f)
                 .padding(start = playerDim(R.dimen.vs_20))
-                .height(playerDim(R.dimen.vs_50)),
+                .heightIn(min = playerDim(R.dimen.vs_50)),
             verticalAlignment = Alignment.CenterVertically,
         ) { content() }
     }
@@ -396,6 +407,7 @@ internal fun SheetStepper(
             text = valueText,
             color = MaterialTheme.colorScheme.onSurface,
             fontSize = playerTextSize(R.dimen.ts_20),
+            lineHeight = playerTextSize(R.dimen.ts_20),
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
             modifier = Modifier.weight(1f),
@@ -435,6 +447,7 @@ internal fun SheetInput(
             textStyle = TextStyle(
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = playerTextSize(R.dimen.ts_26),
+                lineHeight = playerTextSize(R.dimen.ts_26),
                 fontWeight = FontWeight.Medium,
             ),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
@@ -450,6 +463,7 @@ internal fun SheetInput(
                             text = hint,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = playerTextSize(R.dimen.ts_26),
+                            lineHeight = playerTextSize(R.dimen.ts_26),
                             fontWeight = FontWeight.Medium,
                             maxLines = 1,
                         )

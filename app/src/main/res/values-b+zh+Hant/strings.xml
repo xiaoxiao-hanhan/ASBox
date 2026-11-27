@@ -442,6 +442,8 @@
     <string name="config_current_vod_source">目前隨選源：%1$s</string>
     <string name="config_live_source_hint">支援設定 JSON / m3u / txt 直播源</string>
     <string name="config_source_disabled_tag">已停用</string>
+    <string name="config_multi_repo_tag">多倉</string>
+    <string name="config_source_in_use">使用源:%1$s</string>
 
     <string name="tmdb_enable">啟用 TMDB</string>
     <string name="tmdb_poster_style">海報展示樣式</string>
@@ -495,8 +497,8 @@
 https://github.com/CatVodTVOfficial/TVBoxOSC
 https://github.com/q215613905/TVBoxOS
 https://github.com/XiaochangXu/AVBox</string>
-    <string name="settings_github">造訪 GitHub 儲存庫</string>
-    <string name="settings_github_subtitle">造訪專案原始碼儲存庫</string>
+    <string name="settings_github">原始碼位址</string>
+    <string name="settings_github_subtitle">專案原始碼 Github 儲存庫</string>
     <string name="settings_app_tagline">一款開源的影片播放器</string>
     <string name="settings_app_version">應用版本</string>
 
@@ -849,7 +851,30 @@ https://github.com/XiaochangXu/AVBox</string>
     <string name="short_drama_title">短劇</string>
     <string name="short_drama_empty">目前介面或片源裡沒有短劇站點</string>
     <string name="drama_watch_fullscreen">全屏觀看</string>
+    <string name="drama_feed_title">短劇播放器</string>
+    <string name="drama_feed_source_switched">已切換片源：%1$s</string>
+    <string name="drama_feed_source_failed">「%1$s」沒取到內容，已保持目前片源</string>
+    <string name="drama_feed_switching">正在切換片源…</string>
+    <string name="drama_library_title">短劇片庫</string>
+    <string name="drama_feed_tab_anime">漫劇</string>
+    <string name="drama_feed_tab_real">真人劇</string>
+    <string name="drama_feed_tab_recommend">推薦</string>
+    <string name="drama_feed_switch_source">切換源</string>
+    <string name="drama_feed_search">搜尋</string>
+    <string name="drama_feed_episode">第%1$d集</string>
+    <string name="drama_feed_open_detail">進入詳情頁</string>
+    <string name="drama_feed_window_back">返回資訊流</string>
+    <string name="drama_feed_tab_empty">這個分類暫時沒有內容，點左上角換個片源</string>
+    <string name="drama_feed_single_source">只有一個片源，換不了</string>
+    <string name="drama_feed_watch_full">點擊觀看完整劇</string>
+    <string name="drama_feed_danmaku_short">彈</string>
+    <string name="drama_feed_danmaku_unavailable">目前沒有可用彈幕，請先在彈幕設定裡配置</string>
+    <string name="drama_feed_empty">目前介面或片源裡沒有可播放的短劇</string>
+    <string name="drama_feed_play_failed">這部劇沒有可播放的線路</string>
+    <string name="drama_feed_detail_failed">詳情載入失敗，已按列表資訊播放</string>
+    <string name="drama_feed_exit_fullscreen">退出全螢幕</string>
     <string name="drama_episodes">選集</string>
+    <string name="drama_episodes_all">全 %1$d 集</string>
     <string name="drama_speed">倍速</string>
     <string name="live_choice_title">選擇功能</string>
     <string name="runtime_node_import_ok">項目已新增</string>

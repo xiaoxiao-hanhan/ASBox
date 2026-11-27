@@ -102,6 +102,16 @@ class Movie : Serializable {
         @XStreamAlias("action")
         var action: String? = null
 
+        /** 热度（播放量）。苹果 CMS 的 <hits> / JSON 的 vod_hits，用于推荐排序。 */
+        @JvmField
+        @XStreamAlias("hits")
+        var hits: String? = null
+
+        /** 本周热度（vod_hits_week），无总热度时兜底。 */
+        @JvmField
+        @XStreamAlias("hits_week")
+        var hitsWeek: String? = null
+
         @XStreamAlias("dl")
         class UrlBean : Serializable {
             @JvmField

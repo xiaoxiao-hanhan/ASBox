@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -146,7 +147,8 @@ internal const val TOP_BAR_BACK_TAG = "playerTopBarBack"
 @Composable
 fun PlayerTopBar(state: PlayerUiState, actions: PlayerActions) {
     val configuration = LocalConfiguration.current
-    val showActionsInTopBar = configuration.orientation != Configuration.ORIENTATION_PORTRAIT
+    val portraitActionsStyle = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+    val showActionsInTopBar = !portraitActionsStyle
     val rightVisible = state.topRightVisible && !state.previewMode
     val edge = playerEdgePadding()
     val topPad = if (state.previewMode) PreviewTopPadding else FullscreenTopPadding
@@ -201,10 +203,20 @@ fun PlayerTopBar(state: PlayerUiState, actions: PlayerActions) {
                     verticalAlignment = Alignment.Top,
                 ) {
                     if (state.topLeftVisible) {
-                    Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    var titleHeightPx by remember { mutableStateOf(0f) }
+                    // X 与第一行标题对齐，而不是与「标题+分辨率」整个两行块对齐。
+                    // 标题高度实测后算出偏移，跨机型/字体缩放都能保持同一水平线。
+                    val backBoxHeightPx = with(density) { TopBarLineHeight.toPx() }
+                    val backOffsetY = if (titleHeightPx > 0f) {
+                        with(density) { ((titleHeightPx - backBoxHeightPx) / 2f).toDp() }
+                    } else {
+                        0.dp
+                    }
+                    Row(Modifier.weight(1f), verticalAlignment = Alignment.Top) {
                         Box(
                             Modifier
                                 .size(TopBarLineHeight)
+                                .offset(y = backOffsetY)
                                 .playerPressEffect(onTap = { actions.onBackClicked() }),
                             contentAlignment = Alignment.Center,
                         ) {
@@ -222,10 +234,17 @@ fun PlayerTopBar(state: PlayerUiState, actions: PlayerActions) {
                             Text(
                                 text = state.title,
                                 color = Color.White,
-                                fontSize = playerTextSize(R.dimen.ts_26),
+                                // 竖屏剧名放大一档（26 -> 32）；横屏按长边换算本就偏大，
+                                // 回落到 24，避免片名撑满半屏。
+                                fontSize = playerTextSize(
+                                    if (portraitActionsStyle) R.dimen.ts_32 else R.dimen.ts_24,
+                                ),
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.onGloballyPositioned {
+                                    titleHeightPx = it.size.height.toFloat()
+                                },
                             )
                             val sizeLine = if (state.videoQuality.isBlank()) {
                                 state.videoSize
@@ -236,11 +255,14 @@ fun PlayerTopBar(state: PlayerUiState, actions: PlayerActions) {
                                 Text(
                                     text = sizeLine,
                                     color = Color.White.copy(alpha = 0.72f),
-                                    fontSize = playerTextSize(R.dimen.ts_18),
+                                    fontSize = playerTextSize(
+                                        if (portraitActionsStyle) R.dimen.ts_18 else R.dimen.ts_16,
+                                    ),
                                     fontWeight = FontWeight.Medium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(top = 2.dp),
+                                    // 分辨率行整体上移一点，贴近标题。
+                                    modifier = Modifier.offset(y = -6.dp),
                                 )
                             }
                         }
@@ -250,36 +272,14 @@ fun PlayerTopBar(state: PlayerUiState, actions: PlayerActions) {
                 }
                 if (rightVisible) {
                     Column(horizontalAlignment = Alignment.End) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.heightIn(min = TopBarSysInfoMinHeight),
-                        ) {
-                            if (state.batteryPercent in 0..100) {
-                                Text(
-                                    text = "${state.batteryPercent}%",
-                                    color = Color.White,
-                                    fontSize = playerTextSize(R.dimen.ts_18),
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                )
-                                Image(
-                                    painter = painterResource(batteryIcon(state)),
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .padding(start = 4.dp, end = playerDim(R.dimen.vs_10))
-                                        .size(batteryIconSize),
-                                )
-                            }
-                            Text(
-                                text = state.sysTime,
-                                color = Color.White,
-                                fontSize = playerTextSize(R.dimen.ts_18),
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                            )
-                        }
+                        // 右上角电量/时间信息已删除（用户标记位置）；横屏功能键仍保留在这里。
                         if (showActionsInTopBar) {
-                            PlayerActionIcons(actions = actions)
+                            // 横屏按长边换算，默认 60/40mm 图标偏大，回落到 42/28mm。
+                            PlayerActionIcons(
+                                actions = actions,
+                                size = playerDim(R.dimen.vs_40),
+                                iconSize = playerDim(R.dimen.vs_24),
+                            )
                         }
                     }
                 }

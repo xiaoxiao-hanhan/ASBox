@@ -1,16 +1,20 @@
 package com.github.aura.asbox.ui.base
 
 import com.github.aura.asbox.util.AppLog
+import android.app.AlertDialog
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.content.res.Resources
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
 import android.os.Looper
 import android.util.DisplayMetrics
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ScrollView
+import android.widget.TextView
 
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.snapshotFlow
@@ -105,7 +109,40 @@ abstract class BaseActivity : AppCompatActivity(), CustomAdapt {
                 refreshAutoSize()
                 scheduleRefreshAutoSize()
             }
+            showCrashStackIfAny()
         }
+    }
+
+    private var crashDialogShown = false
+
+    /**
+     * 上一次未捕获崩溃会让进程重启、Activity 栈回退（表现为"闪退回主页/信息流"）。
+     * 这里把落盘的完整堆栈弹出来，复现后截图即可一次定位，不再靠猜。
+     * 只在整个进程里弹一次，读完即删。
+     */
+    private fun showCrashStackIfAny() {
+        if (crashDialogShown) return
+        val stack = com.github.aura.asbox.boot.BootGuard.takeCrashStack()
+        if (stack.isBlank()) return
+        crashDialogShown = true
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (isFinishing || isDestroyed) return@postDelayed
+            try {
+                val tv = TextView(this).apply {
+                    text = stack
+                    textSize = 12f
+                    setTextIsSelectable(true)
+                    setPadding(32, 24, 32, 24)
+                }
+                val scroll = ScrollView(this).apply { addView(tv) }
+                AlertDialog.Builder(this)
+                    .setTitle("上次崩溃堆栈（可截图反馈）")
+                    .setView(scroll)
+                    .setPositiveButton("关闭", null)
+                    .show()
+            } catch (ignored: Throwable) {
+            }
+        }, 600L)
     }
 
     internal fun applyHideStatusBarPref() {

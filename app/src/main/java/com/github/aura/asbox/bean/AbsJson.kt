@@ -240,6 +240,9 @@ class AbsJson : Serializable {
             }
             video.urlBean = urlBean
             video.des = vod_content
+            // 热度（播放量）：苹果 CMS 的 vod_hits / vod_hits_week，供短剧推荐按热度排序。
+            video.hits = vod_hits
+            video.hitsWeek = vod_hits_week
             return video
         }
     }

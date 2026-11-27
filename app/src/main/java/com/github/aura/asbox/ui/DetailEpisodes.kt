@@ -25,6 +25,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -58,7 +60,7 @@ import com.github.aura.asbox.bean.TmdbEpisode
 import com.github.aura.asbox.bean.VodInfo
 import com.github.aura.asbox.data.EpisodeMatcher
 import com.github.aura.asbox.ui.components.AVBoxBottomSheet
-import com.github.aura.asbox.ui.components.LocalSheetDismiss
+import com.github.aura.asbox.ui.components.LocalSheetDismissThen
 import com.github.aura.asbox.ui.theme.filterChipColors
 import com.github.aura.asbox.util.TmdbImages
 import kotlinx.coroutines.launch
@@ -375,8 +377,18 @@ internal fun EpisodeSheet(vm: DetailViewModel, slideFromEnd: Boolean, showQualit
             Modifier.fillMaxHeight(EpisodeSheetHeightFraction)
         },
     ) {
-        val dismissAnimated = LocalSheetDismiss.current
+        val dismissThen = LocalSheetDismissThen.current
         Column(modifier = Modifier.fillMaxWidth()) {
+            // 选集框里直接标出总集数（「全 41 集」），不用自己数。
+            if (episodes.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.drama_episodes_all, episodes.size),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
             if (showQuality && qualityOptions.size > 1) {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
@@ -457,8 +469,14 @@ internal fun EpisodeSheet(vm: DetailViewModel, slideFromEnd: Boolean, showQualit
                     FilterChip(
                         selected = index == playIndex,
                         onClick = {
-                            vm.onEpisodeClick(index)
-                            dismissAnimated()
+                            // 竖屏全屏下选集会闪退：面板还在做收起动画时就切集，
+                            // 播放器重建和面板移除撞在同一帧。先收起面板，下一帧再切集。
+                            dismissThen {
+                                vm.dismissEpisodeSheet()
+                                Handler(Looper.getMainLooper()).post {
+                                    vm.onEpisodeClick(index)
+                                }
+                            }
                         },
                         modifier = Modifier
                             .fillMaxWidth()

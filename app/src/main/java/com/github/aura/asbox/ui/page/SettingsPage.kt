@@ -390,7 +390,7 @@ private fun AboutSheet(versionName: String, onDismiss: () -> Unit) {
 
 private const val AboutSheetHeightFraction = 0.6f
 
-private const val GITHUB_REPO_URL = "https://github.com/XiaochangXu/AVBox"
+private const val GITHUB_REPO_URL = "https://github.com/xiaoxiao-hanhan/ASBox"
 
 private fun openExternalUrl(context: Context, url: String) {
     try {

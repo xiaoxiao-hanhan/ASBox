@@ -50,6 +50,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
@@ -118,8 +120,11 @@ fun DetailScreen(activity: DetailActivity, vm: DetailViewModel) {
     val full by vm.fullScreen.collectAsState()
     val rotating by vm.rotating.collectAsState()
     val playSignal by vm.playSignal.collectAsState()
+    val directPlay by vm.directPlay.collectAsState()
     val collectedState by vm.collected.collectAsState()
     val dramaMode by vm.shortDrama.collectAsState()
+    // 从短剧信息流进来时带了「竖屏片源」提示：画面尺寸还没回来之前也先按竖屏小窗排。
+    val dramaPortraitHint by vm.dramaPortrait.collectAsState()
     val enteringFullscreen by vm.enteringFullscreen.collectAsState()
     val exitingFullscreen by vm.exitingFullscreen.collectAsState()
     val vodMenu = rememberVodCardMenuState(
@@ -163,11 +168,16 @@ fun DetailScreen(activity: DetailActivity, vm: DetailViewModel) {
     var embeddedChromePx by remember { mutableStateOf(0) }
     // 播放器那一层的实测高度：短剧竖屏按它算视频区尺寸，避免用 configuration 屏高重复扣系统栏。
     var playerBoxPx by remember { mutableStateOf(0) }
+    var playerBoxWidthPx by remember { mutableStateOf(0) }
     // 底部控制条（全屏观看/进度/选集…）的实测高度：画面高度 = 整层高度 - 顶栏 - 它。
     var deckBelowPx by remember { mutableStateOf(0) }
     // 竖屏铺满时，控制条里「进度条那一块」的高度（含导航栏）：
     // 画面从顶栏下沿一直铺到它的上沿，中间那排功能图标就浮在画面上。
     var bottomBlockPx by remember { mutableStateOf(0) }
+    // 进度条那一行的 y（相对窗口）：画面矩形下沿照信息流页那样贴到它上面一点。
+    var seekBarTopPx by remember { mutableStateOf(0) }
+    val seekGapPx = with(density) { 6.dp.toPx() }.toInt()
+    val bottomDropPx = with(density) { 9.dp.toPx() }.toInt()
 
     val embedded = container != null && !full && !rotating && !inTransition
     // 首页点播的竖屏片源：小窗里画面铺满（裁剪边缘），并且不显示「全屏」按钮。
@@ -216,8 +226,12 @@ fun DetailScreen(activity: DetailActivity, vm: DetailViewModel) {
         }
     }
 
-    LaunchedEffect(full, playSignal) {
-        if (activity.playContainer == null && (full || playSignal > 0)) activity.ensurePlayContainer()
+    // 从短剧信息流的「点击观看完整剧」进来（directPlay）：第一帧就要有播放容器，
+    // 直接摆出播放壳；否则会先渲染一帧详情页，再被播放窗口盖掉（用户说的「先跳详情页再跳播放窗口」）。
+    LaunchedEffect(full, playSignal, directPlay) {
+        if (activity.playContainer == null && (full || playSignal > 0 || directPlay)) {
+            activity.ensurePlayContainer()
+        }
     }
 
     LaunchedEffect(vm) {
@@ -408,7 +422,8 @@ fun DetailScreen(activity: DetailActivity, vm: DetailViewModel) {
             if (playerContainer != null) {
                 // 播放器自始至终只有一个 AndroidView 宿主：嵌入/全屏只改它的摆放几何，
                 // 绝不在两个宿主之间搬家——搬家会把视频表面弄坏（全屏时画面只剩左上角一小块）。
-                val embeddedTopPx = WindowInsets.statusBars.getTop(density) +
+                val statusBarTopPx = WindowInsets.statusBars.getTop(density)
+                val embeddedTopPx = statusBarTopPx +
                     with(density) { 56.dp.roundToPx() }
                 // 片源画幅（宽/高）：只用来判断竖屏片源，未知时是 0（退回原来的做法）。
                 val playerUiState = playerContainer.uiState()
@@ -418,7 +433,10 @@ fun DetailScreen(activity: DetailActivity, vm: DetailViewModel) {
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .onSizeChanged { playerBoxPx = it.height },
+                        .onSizeChanged {
+                            playerBoxPx = it.height
+                            playerBoxWidthPx = it.width
+                        },
                 ) {
                     // 以播放器这一层的实际高度为准算尺寸：不再用 configuration 的屏高去减系统栏
                     // （会重复扣减，导致底部漏出半截推荐内容）。
@@ -445,7 +463,8 @@ fun DetailScreen(activity: DetailActivity, vm: DetailViewModel) {
                     // 竖屏片源的短剧：按「画面宽度撑满屏幕」来放大（高度 = 宽 / 画幅）。
                     // 放不下时向下延伸，多出来的那截被底部控制条的黑底盖住——
                     // 之前按高度塞进控制条上方，竖屏画面两边会留一条黑边，看起来小一圈。
-                    val portraitCover = dramaMode && videoAspect in 0.01f..0.99f
+                    val portraitCover = dramaMode &&
+                        (videoAspect in 0.01f..0.99f || (videoAspect <= 0.01f && dramaPortraitHint))
                     // 首页竖屏点播小窗：画面铺到「进度条那块黑底」的上沿为止
                     // （用户划的那条红线），中间的功能图标浮在画面上。
                     val portraitFillPx = if (portraitPointPlay && bottomBlockPx > 0) {
@@ -470,35 +489,102 @@ fun DetailScreen(activity: DetailActivity, vm: DetailViewModel) {
                             .layout { measurable, constraints ->
                                 if (embedded) {
                                     val w = constraints.maxWidth
-                                    // 小窗和全屏各管各的画面比例，互不影响：
-                                    // - 小窗：窗口位置/大小保持原样——顶栏下沿铺到底部控制条上沿，
-                                    //   画面按片源原画幅居中显示（16:9 片源就是屏幕正中的一条 16:9，
-                                    //   不再像上一版那样把窗口缩成 16:9 顶在标题下方）；
-                                    // - 短剧竖屏片源：窗口高度按画幅算，画面填满窗口。
-                                    // 全屏（下面的 else 分支）完全不受这里影响，仍是原画幅完整显示。
-                                    val h = if (portraitCover) {
-                                        (w / videoAspect).toInt()
-                                            .coerceIn(bandPx, constraints.maxHeight - videoTopPx)
-                                    } else if (portraitPointPlay) {
-                                        // 竖屏点播：满宽铺到进度条上沿，多出来的边被裁掉。
-                                        portraitFillPx
+                                    if (portraitCover) {
+                                        // 竖屏短剧：画面定位整套照搬信息流页（图一）——用户红线
+                                        // 就是照那套算法画的，两页用同一公式才会落在同一位置。
+                                        //   顶沿 = 屏高 5%；
+                                        //   基准下沿 = 进度条 y − 6dp，画面底沿 = 基准下沿 + 9dp；
+                                        //   顶部锚点用「基准框」里 contain 的真实顶沿，保持不漂。
+                                        val screenH = constraints.maxHeight
+                                        val frameTop = (screenH * 5f / 100f).toInt().coerceAtLeast(0)
+                                        val baseBottom = if (seekBarTopPx > 0) {
+                                            (seekBarTopPx - seekGapPx).coerceIn(frameTop + 1, screenH)
+                                        } else {
+                                            screenH
+                                        }
+                                        val frameBottom = (baseBottom + bottomDropPx)
+                                            .coerceIn(frameTop + 1, screenH)
+                                        // 切集瞬间 forgetVideoSize 会把画幅清成「0 X 0」，
+                                        // 这时 w/videoAspect 会除零得到 Int.MAX_VALUE，
+                                        // 后面 Constraints.fixed 拿到巨大高度会直接把播放器崩掉。
+                                        // 画幅没回来前先按 0 处理（画面按框居中），新尺寸上来再按真实画幅排。
+                                        val baseVh = if (videoAspect > 0.01f) (w / videoAspect).toInt() else 0
+                                        val baseBoxH = baseBottom - frameTop
+                                        val baseBoxAspect = w.toFloat() / baseBoxH
+                                        val oldTop = if (videoAspect > baseBoxAspect) {
+                                            frameTop + (baseBoxH - baseVh) / 2
+                                        } else {
+                                            frameTop
+                                        }
+                                        val targetTop = oldTop.coerceAtMost(frameBottom - 1)
+                                        val vh = frameBottom - targetTop
+                                        // 宽度至少撑满屏宽：多出来的左右各裁一点，绝不留黑边。
+                                        val vw = (vh * videoAspect).toInt().coerceAtLeast(w)
+                                        val placeable = measurable.measure(Constraints.fixed(vw, vh))
+                                        layout(w, screenH) {
+                                            placeable.place((w - vw) / 2, targetTop)
+                                        }
                                     } else {
-                                        bandPx
-                                    }
-                                    val placeable = measurable.measure(Constraints.fixed(w, h))
-                                    layout(w, constraints.maxHeight) {
-                                        placeable.place(0, videoTopPx)
+                                        // 小窗（16:9 片源/点播）：窗口位置保持原样——顶栏下沿
+                                        // 铺到底部控制条上沿，画面按片源原画幅居中显示。
+                                        val h = if (portraitPointPlay) {
+                                            portraitFillPx
+                                        } else {
+                                            bandPx
+                                        }
+                                        val placeable = measurable.measure(Constraints.fixed(w, h))
+                                        layout(w, constraints.maxHeight) {
+                                            placeable.place(0, videoTopPx)
+                                        }
                                     }
                                 } else {
-                                    val placeable = measurable.measure(constraints)
-                                    val x = ((1f - slideProgress()) * slideWidthPx).toInt()
-                                    layout(constraints.maxWidth, constraints.maxHeight) {
-                                        placeable.place(x, 0)
+                                    // 全屏：画面铺满整个屏幕（y=0 到屏底），顶部状态栏和底部
+                                    // 导航键透明悬浮在画面之上——不给它们留黑边。
+                                    // 竖屏片源按「更高/更宽」等比裁切铺满整屏；横屏片源仍整屏居中。
+                                    val sw = constraints.maxWidth
+                                    val sh = constraints.maxHeight
+                                    if (videoAspect in 0.01f..0.99f ||
+                                        (videoAspect <= 0.01f && dramaPortraitHint)
+                                    ) {
+                                        val screenAspect = sw.toFloat() / sh
+                                        val vw: Int
+                                        val vh: Int
+                                        // 切集瞬间画幅会被清成「0 X 0」（forgetVideoSize + onNewSession）。
+                                        // 老代码这里 sw/videoAspect 除零 → Infinity.toInt()=Int.MAX_VALUE，
+                                        // 再 Constraints.fixed(vw, 21亿) 直接把播放器崩掉、退回主页。
+                                        // 画幅没回来前先整屏铺满，新尺寸上来再按真实画幅等比裁切。
+                                        if (videoAspect <= 0.01f) {
+                                            vw = sw
+                                            vh = sh
+                                        } else if (videoAspect > screenAspect) {
+                                            // 视频相对更宽：按屏高撑满，左右裁一点。
+                                            vh = sh
+                                            vw = (sh * videoAspect).toInt()
+                                        } else {
+                                            // 视频相对更高：按屏宽撑满，上下裁一点。
+                                            vw = sw
+                                            vh = (sw / videoAspect).toInt()
+                                        }
+                                        val placeable = measurable.measure(Constraints.fixed(vw, vh))
+                                        val x = ((1f - slideProgress()) * slideWidthPx).toInt()
+                                        layout(sw, sh) {
+                                            placeable.place((sw - vw) / 2 + x, (sh - vh) / 2)
+                                        }
+                                    } else {
+                                        val placeable = measurable.measure(constraints)
+                                        val x = ((1f - slideProgress()) * slideWidthPx).toInt()
+                                        layout(constraints.maxWidth, constraints.maxHeight) {
+                                            placeable.place(x, 0)
+                                        }
                                     }
                                 }
                             },
                     )
-                    if (embedded && dramaMode) {
+                    // 倍速/选集等对话框打开时，整层手势直接不组合：弹窗画在播放器自身的
+                    // ComposeView 里，而手势层是盖在它之上的兄弟节点（Z 序更高）。哪怕只是
+                    // 一个空的 pointerInput，也会先拿到 down 事件，导致弹窗选项「点不动」。
+                    // 只把 enabled 设为 false 仍会保留这层 Box，所以这里直接整体跳过组合。
+                    if (embedded && dramaMode && !playerContainer.uiState().overlayPanelOpen) {
                         // 竖屏小窗：视频区上下滑动切上一集/下一集（上滑下一集、下滑上一集）。
                         // 高度正好等于画面，不压到底部控制条，控制条上的按钮照常点。
                         val dramaActions = playerContainer.playerActions()
@@ -516,6 +602,29 @@ fun DetailScreen(activity: DetailActivity, vm: DetailViewModel) {
                                 .height(with(density) { swipePx.toDp() }),
                         )
                     }
+                    if (embedded && dramaMode) {
+                        // 「全屏观看」上移到进度条上方、贴着画面下沿：
+                        // 以前它悬在画面和底部控制条之间那一大片黑里，离画面太远。
+                        val videoH = if (videoAspect > 0.01f && playerBoxWidthPx > 0) {
+                            (playerBoxWidthPx / videoAspect).coerceAtMost(bandPx.toFloat())
+                        } else {
+                            bandPx.toFloat()
+                        }
+                        val barPx = with(density) { 58.dp.toPx() }
+                        val want = embeddedTopPx + (bandPx + videoH) / 2f +
+                            with(density) { 12.dp.toPx() }
+                        val deckTop = (boxPx - deckPx).toFloat()
+                        val barTop = want.coerceAtMost(deckTop - barPx)
+                            .coerceAtLeast(embeddedTopPx + barPx)
+                        DramaFullscreenBar(
+                            onFullscreen = {
+                                vm.onFullScreenToggleRequested(true, activity.playbackFacts())
+                            },
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .offset { IntOffset(0, barTop.toInt()) },
+                        )
+                    }
                     if (embedded) {
                         Column(
                             Modifier
@@ -524,9 +633,11 @@ fun DetailScreen(activity: DetailActivity, vm: DetailViewModel) {
                         ) {
                             val chromeUi = playerContainer.uiState()
                             if (dramaMode) {
+                                // 左上角只显示第几集：剧名/简介改到底部控制条里（红果那种排法）。
+                                val episodeNo = (chromeUi.sessionVod?.playIndex
+                                    ?: vm.vodInfo?.playIndex ?: 0) + 1
                                 DramaTopBar(
-                                    title = chromeUi.title
-                                        .ifEmpty { vm.vodInfo?.name ?: "" },
+                                    title = stringResource(R.string.drama_feed_episode, episodeNo),
                                     actions = playerContainer.playerActions(),
                                     onBack = { activity.onBackPressedDispatcher.onBackPressed() },
                                 )
@@ -567,14 +678,6 @@ fun DetailScreen(activity: DetailActivity, vm: DetailViewModel) {
                                     ),
                             ) {
                                 val actions = playerContainer.playerActions()
-                                if (dramaMode && actions != null) {
-                                    // 「全屏观看」回到视频下方原来的位置（控制条第一行）。
-                                    DramaFullscreenBar(
-                                        onFullscreen = {
-                                            vm.onFullScreenToggleRequested(true, activity.playbackFacts())
-                                        },
-                                    )
-                                }
                                 if (actions != null) {
                                     if (dramaMode) {
                                         // 进度 + 选集：铺纯黑到底（含导航栏区域），
@@ -582,14 +685,44 @@ fun DetailScreen(activity: DetailActivity, vm: DetailViewModel) {
                                         Column(
                                             Modifier
                                                 .fillMaxWidth()
-                                                .background(Color.Black)
+                                                // 和信息流页保持一致：剧名/简介浮在画面上，
+                                                // 详情块上半截透明，画面一直铺到进度条上沿；
+                                                // 只有进度/选集那一截才是纯黑底。
+                                                .background(
+                                                    Brush.verticalGradient(
+                                                        0f to Color.Transparent,
+                                                        0.38f to Color.Transparent,
+                                                        0.5f to Color.Black,
+                                                        1f to Color.Black,
+                                                    )
+                                                )
                                                 .navigationBarsPadding(),
                                         ) {
+                                            // 红果式排法：进度 → 剧名（点进详情）→「第N集 | 简介 … 展开」→ 选集（带总集数）。
+                                            val deckUi = playerContainer.uiState()
+                                            val deckSession = deckUi.sessionVod
+                                            val deckEpisode = (deckSession?.playIndex
+                                                ?: vm.vodInfo?.playIndex ?: 0) + 1
+                                            val deckCount = deckSession?.seriesMap
+                                                ?.get(deckSession.playFlag)?.size
+                                                ?: vm.vodInfo?.seriesMap
+                                                    ?.get(vm.vodInfo?.playFlag)?.size
+                                                ?: 0
                                             DramaDeck(
-                                                state = playerContainer.uiState(),
+                                                state = deckUi,
                                                 actions = actions,
-                                                // 剧名已经在顶部浮层显示，底部不再重复一行。
-                                                dramaName = "",
+                                                dramaName = vm.vodInfo?.name
+                                                    ?: deckSession?.name.orEmpty(),
+                                                dramaDescription = vm.vodInfo?.des
+                                                    ?: deckSession?.des.orEmpty(),
+                                                episodeLabel = stringResource(
+                                                    R.string.drama_feed_episode,
+                                                    deckEpisode,
+                                                ),
+                                                episodeCount = deckCount,
+                                                onNameClick = null,
+                                                // 进度条 y 回传给画面 View（和信息流页同一锚点）。
+                                                onSeekBarY = { seekBarTopPx = it },
                                             )
                                         }
                                     } else {

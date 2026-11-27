@@ -21,10 +21,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -191,8 +196,9 @@ internal fun DramaTopBar(
     Row(
         modifier
             .fillMaxWidth()
-            // 短剧顶栏同样纯黑，不用「黑→透明」渐变，避免透出海报变成一片模糊色。
-            .background(Color.Black)
+            // 和信息流页 FeedTopBar 完全一致：顶栏纯透明、无任何压黑暗底，
+            // 返回/倍速/菜单按钮直接浮在画面上——用户对比图一（正常）与图二
+            // （视频顶部有一块阴影），那块阴影就是这层渐变，去掉即可。
             .statusBarsPadding()
             .height(56.dp)
             .padding(horizontal = 4.dp),
@@ -275,11 +281,23 @@ internal fun DramaFullscreenBar(
 
 
 /**
- * 短剧模式的干净控制台（红果式）：剧名 + 一行进度（播放/暂停、当前时间、进度条、总时长）+ 选集条。
- * 不带点播那一整套按钮（投屏/字幕/弹幕/音轨/上下集等），需要时进全屏里有。
+ * 短剧模式的干净控制台（红果式）：
+ * 一行进度（播放/暂停、当前时间、进度条、总时长）→ 剧名（可点进详情）→「第N集 | 简介 … 展开」
+ * → 选集条（右侧标总集数）。不带点播那一整套按钮，需要时进全屏里有。
  */
 @Composable
-fun DramaDeck(state: PlayerUiState, actions: PlayerActions, dramaName: String) {
+fun DramaDeck(
+    state: PlayerUiState,
+    actions: PlayerActions,
+    dramaName: String,
+    dramaDescription: String = "",
+    episodeLabel: String = "",
+    episodeCount: Int = 0,
+    onNameClick: (() -> Unit)? = null,
+    /** 进度条那一行在窗口里的 y（px），画面下沿照信息流页那样贴到它上面一点。 */
+    onSeekBarY: (Int) -> Unit = {},
+) {
+    var expanded by remember(dramaName) { mutableStateOf(false) }
     Column(
         Modifier
             .fillMaxWidth()
@@ -287,17 +305,70 @@ fun DramaDeck(state: PlayerUiState, actions: PlayerActions, dramaName: String) {
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         if (dramaName.isNotBlank()) {
-            Text(
-                text = dramaName,
-                color = Color.White,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(6.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = onNameClick != null) { onNameClick?.invoke() },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = dramaName,
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (onNameClick != null) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_arrow_left),
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier
+                            .size(17.dp)
+                            .padding(start = 2.dp)
+                            .rotate(180f),
+                    )
+                }
+            }
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
+
+        if (dramaDescription.isNotBlank()) {
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.Top) {
+                Text(
+                    text = listOf(episodeLabel, dramaDescription)
+                        .filter { it.isNotBlank() }
+                        .joinToString(" | "),
+                    color = Color.White.copy(alpha = 0.62f),
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    maxLines = if (expanded) Int.MAX_VALUE else 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = stringResource(
+                        if (expanded) R.string.detail_collapse else R.string.detail_expand,
+                    ),
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontSize = 13.sp,
+                    modifier = Modifier
+                        .clickable { expanded = !expanded }
+                        .padding(start = 10.dp, top = 1.dp),
+                )
+            }
+        }
+
+        // 进度条贴在选集框上面：先剧名、简介，再播放/进度，最后选集。
+        Spacer(Modifier.height(10.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.onGloballyPositioned {
+                onSeekBarY(it.positionInWindow().y.toInt())
+            },
+        ) {
             PreviewPlayPauseButton(state, actions)
             CurrentTimeText(state)
             PlayerSeekRow(state, actions, Modifier.weight(1f).padding(horizontal = 8.dp))
@@ -308,6 +379,7 @@ fun DramaDeck(state: PlayerUiState, actions: PlayerActions, dramaName: String) {
                 maxLines = 1,
             )
         }
+
         Spacer(Modifier.height(10.dp))
         Row(
             Modifier
@@ -324,6 +396,15 @@ fun DramaDeck(state: PlayerUiState, actions: PlayerActions, dramaName: String) {
                 fontSize = 14.sp,
                 maxLines = 1,
             )
+            if (episodeCount > 0) {
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.drama_episodes_all, episodeCount),
+                    color = Color.White.copy(alpha = 0.55f),
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                )
+            }
             Spacer(Modifier.weight(1f))
             Icon(
                 painter = painterResource(R.drawable.ic_arrow_down),

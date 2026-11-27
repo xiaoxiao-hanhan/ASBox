@@ -8,6 +8,10 @@ object KVKeys {
     const val API_LINE_SOURCE = "api_line_source"
     const val LIVE_API_LINE_LIST = "live_api_line_list"
     const val LIVE_API_LINE_SOURCE = "live_api_line_source"
+
+    /** 被识别为「多仓」的源地址（解析配置时发现里面有 urls 线路列表），用于界面打「多仓」标记。 */
+    const val MULTI_REPO_SOURCES = "multi_repo_sources"
+    const val MULTI_REPO_LIVE_SOURCES = "multi_repo_live_sources"
     const val BOOT_LOADING_JAR = "boot_loading_jar"
     const val BOOT_LOADING_SCOPE = "boot_loading_scope"
     const val BOOT_LOADING_COUNT = "boot_loading_count"

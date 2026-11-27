@@ -61,7 +61,8 @@ private const val SuggestDebounceMs = 120L
 private fun rememberSearchViewModel(): SearchViewModel {
     val activity = LocalContext.current as? android.app.Activity
     val initialTitle = activity?.intent?.getStringExtra("title").orEmpty()
-    return viewModel(initializer = { SearchViewModel(initialTitle) })
+    val siteKey = activity?.intent?.getStringExtra("site_key")
+    return viewModel(initializer = { SearchViewModel(initialTitle, siteKey) })
 }
 
 @Composable

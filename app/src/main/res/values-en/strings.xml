@@ -442,6 +442,8 @@
     <string name="config_current_vod_source">Current VOD source: %1$s</string>
     <string name="config_live_source_hint">Supports JSON / m3u / txt live sources</string>
     <string name="config_source_disabled_tag">Disabled</string>
+    <string name="config_multi_repo_tag">Multi-repo</string>
+    <string name="config_source_in_use">In use: %1$s</string>
 
     <string name="tmdb_enable">Enable TMDB</string>
     <string name="tmdb_poster_style">Poster display style</string>
@@ -495,8 +497,8 @@ Keep the credits when redistributing
 https://github.com/CatVodTVOfficial/TVBoxOSC
 https://github.com/q215613905/TVBoxOS
 https://github.com/XiaochangXu/AVBox</string>
-    <string name="settings_github">Visit GitHub Repository</string>
-    <string name="settings_github_subtitle">Open the project source repository</string>
+    <string name="settings_github">Source Code</string>
+    <string name="settings_github_subtitle">Project source code GitHub repository</string>
     <string name="settings_app_tagline">Open-source video player</string>
     <string name="settings_app_version">App version</string>
 
@@ -849,7 +851,30 @@ https://github.com/XiaochangXu/AVBox</string>
     <string name="short_drama_title">Short Drama</string>
     <string name="short_drama_empty">No short-drama sites in the current config or sources</string>
     <string name="drama_watch_fullscreen">Watch fullscreen</string>
+    <string name="drama_feed_title">Short Drama Player</string>
+    <string name="drama_feed_source_switched">Source: %1$s</string>
+    <string name="drama_feed_source_failed">%1$s returned nothing, staying on the current source</string>
+    <string name="drama_feed_switching">Switching source…</string>
+    <string name="drama_library_title">Drama library</string>
+    <string name="drama_feed_tab_anime">Animated</string>
+    <string name="drama_feed_tab_real">Live action</string>
+    <string name="drama_feed_tab_recommend">For you</string>
+    <string name="drama_feed_switch_source">Switch source</string>
+    <string name="drama_feed_search">Search</string>
+    <string name="drama_feed_episode">Episode %1$d</string>
+    <string name="drama_feed_open_detail">Enter details</string>
+    <string name="drama_feed_window_back">Back to feed</string>
+    <string name="drama_feed_tab_empty">No titles in this category, tap the logo to change source</string>
+    <string name="drama_feed_single_source">Only one source available</string>
+    <string name="drama_feed_watch_full">Watch the full drama</string>
+    <string name="drama_feed_danmaku_short">D</string>
+    <string name="drama_feed_danmaku_unavailable">No danmaku available, set it up in danmaku settings</string>
+    <string name="drama_feed_empty">No playable short drama in the current source</string>
+    <string name="drama_feed_play_failed">No playable line for this drama</string>
+    <string name="drama_feed_detail_failed">Details failed to load, playing from list info</string>
+    <string name="drama_feed_exit_fullscreen">Exit fullscreen</string>
     <string name="drama_episodes">Episodes</string>
+    <string name="drama_episodes_all">%1$d episodes</string>
     <string name="drama_speed">Speed</string>
     <string name="live_choice_title">Choose</string>
     <string name="runtime_node_import_ok">Project added</string>

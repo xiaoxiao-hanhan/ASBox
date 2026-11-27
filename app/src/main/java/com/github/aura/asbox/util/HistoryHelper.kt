@@ -182,4 +182,50 @@ object HistoryHelper {
         if (!isLiveApiLineUrl(activeUrl)) return false
         return url.trim { it <= ' ' } == KV.get(KVKeys.LIVE_API_LINE_SOURCE, "")
     }
+
+    /**
+     * 记住「这个源是多仓配置」（配置里带 urls 线路列表）。
+     * 单仓配置重新加载成功时用 clearMultiRepoSource 抹掉标记，避免误标。
+     */
+    @JvmStatic
+    fun markMultiRepoSource(url: String?, live: Boolean) {
+        if (url == null || url.trim { it <= ' ' }.isEmpty()) return
+        val key = if (live) KVKeys.MULTI_REPO_LIVE_SOURCES else KVKeys.MULTI_REPO_SOURCES
+        val list = KV.get(key, ArrayList<String>())
+        if (list.contains(url)) return
+        list.add(url)
+        KV.put(key, list)
+    }
+
+    @JvmStatic
+    fun clearMultiRepoSource(url: String?, live: Boolean) {
+        if (url == null || url.trim { it <= ' ' }.isEmpty()) return
+        val key = if (live) KVKeys.MULTI_REPO_LIVE_SOURCES else KVKeys.MULTI_REPO_SOURCES
+        val list = KV.get(key, ArrayList<String>())
+        if (!list.contains(url)) return
+        list.remove(url)
+        KV.put(key, list)
+    }
+
+    @JvmStatic
+    fun isMultiRepoSource(url: String?, live: Boolean): Boolean {
+        if (url == null || url.trim { it <= ' ' }.isEmpty()) return false
+        val key = if (live) KVKeys.MULTI_REPO_LIVE_SOURCES else KVKeys.MULTI_REPO_SOURCES
+        return KV.get(key, ArrayList<String>()).contains(url.trim { it <= ' ' })
+    }
+
+    /**
+     * 多仓源当前正在使用的线路名。
+     * 只有「这批线路确实来自这个源」时才知道（否则那批线路属于别的源，不能张冠李戴）。
+     */
+    @JvmStatic
+    fun currentApiLineName(sourceUrl: String?, activeUrl: String?, live: Boolean): String {
+        if (sourceUrl == null || sourceUrl.trim { it <= ' ' }.isEmpty()) return ""
+        val sourceKey = if (live) KVKeys.LIVE_API_LINE_SOURCE else KVKeys.API_LINE_SOURCE
+        if (KV.get(sourceKey, "") != sourceUrl.trim { it <= ' ' }) return ""
+        val lines = if (live) liveApiLines() else getApiLines()
+        if (lines.isEmpty()) return ""
+        val matched = lines.firstOrNull { apiLineUrl(it) == activeUrl } ?: lines.first()
+        return apiLineName(matched)
+    }
 }

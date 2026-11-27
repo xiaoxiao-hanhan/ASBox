@@ -114,6 +114,11 @@
             android:name=".ui.ShortDramaActivity"
             android:theme="@style/AppTheme.NoActionBar.FadeIn" />
         <activity
+            android:name=".ui.drama.DramaFeedActivity"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:theme="@style/AppTheme.NoActionBar.FadeIn" />
+        <activity
             android:name=".ui.DanmuSettingsActivity" />
         <activity
             android:name=".ui.DanmuServiceActivity" />

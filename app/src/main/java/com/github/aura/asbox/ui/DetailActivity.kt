@@ -14,6 +14,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -68,11 +69,28 @@ class DetailActivity : BaseActivity(), PageHost {
 
     override fun shouldRefreshAutoSize(): Boolean = true
 
+    // 竖屏全屏：状态栏和底部导航键透明悬浮在画面上，不再沉浸隐藏。
+    // 横屏全屏（首页点播/短剧横屏）：顶部状态栏不显示，用沉浸式隐藏。
     override fun hideSysBar() {
-        if (vm.fullScreen.value) super.hideSysBar()
+        if (isLandscapeFullscreen()) {
+            val controller = WindowCompat.getInsetsController(window, window.decorView)
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.statusBars())
+        }
     }
 
-    override fun keepStatusBarHidden(): Boolean = vm.fullScreen.value
+    /** 当前是否横屏全屏（横屏全屏才隐藏状态栏；竖屏全屏保持悬浮）。 */
+    private fun isLandscapeFullscreen(): Boolean {
+        if (!vm.fullScreen.value) return false
+        // 与 fullscreenOrientation(true) 同一判定：竖屏片源走竖屏全屏，其余横屏全屏。
+        // 不看 resources.configuration.orientation —— 点全屏那一刻方向还没转过来。
+        val container = playContainer
+        val portraitVideo = container != null && container.hasVideoSize() && container.isPortraitVideo()
+        return !portraitVideo
+    }
+
+    override fun keepStatusBarHidden(): Boolean = isLandscapeFullscreen()
 
     private var statusBarIconsLight = false
 
@@ -140,6 +158,16 @@ class DetailActivity : BaseActivity(), PageHost {
             }
         })
         vm.initFromIntent(intent)
+        // 从短剧信息流「点击观看完整剧」进来（autoPlay）：先把播放容器建好再组合界面，
+        // 第一帧就是播放壳。否则会先渲染详情页/加载圈，等详情回来才切到播放窗口。
+        if (vm.directPlay.value) {
+            ensurePlayContainer()
+            // 「全屏观看」进来：直接把全屏状态置上，第一帧就是全屏播放器，
+            // 不经过详情页、也不经过小窗。
+            if (intent?.getBooleanExtra("openFullscreen", false) == true) {
+                vm.enterFullscreenInstant()
+            }
+        }
         findViewById<androidx.compose.ui.platform.ComposeView>(R.id.compose_view).setContent {
             AVBoxTheme(manageStatusBarIcons = false) {
                 SheetHostScaffold {
@@ -368,7 +396,21 @@ class DetailActivity : BaseActivity(), PageHost {
         requestedOrientation = fullscreenOrientation(full)
         if (full) {
             armVideoSizeWatch()
-            hideSysBar()
+            val controller = WindowCompat.getInsetsController(window, window.decorView)
+            controller.show(WindowInsetsCompat.Type.navigationBars())
+            // 横屏全屏（首页点播/短剧横屏）：顶部状态栏不显示，直接藏掉。
+            // 竖屏全屏：状态栏和底部导航键透明悬浮在画面上——画面铺满整屏，
+            // 系统栏不隐藏、不占画面，直接浮在视频之上。
+            // 注意：这里不调用 applyHideStatusBarPref()，否则全局「隐藏状态栏」偏好
+            // 会在 show 之后又把状态栏藏回去（上一版全屏异常的根因）。
+            if (isLandscapeFullscreen()) {
+                controller.systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller.hide(WindowInsetsCompat.Type.statusBars())
+            } else {
+                controller.show(WindowInsetsCompat.Type.statusBars())
+            }
+            applyStatusBarAppearance()
         } else {
             videoSizeWatchArmed = false
             playContainer?.videoSizeReadyListener = null
@@ -442,6 +484,14 @@ class DetailActivity : BaseActivity(), PageHost {
         // 横屏刚转好就被改回竖屏，表现就是「点全屏闪一下又回到竖屏」。
         if (vm.fullScreen.value) {
             requestedOrientation = fullscreenOrientation(true)
+            // 方向落地后按横/竖屏重新应用状态栏策略（横屏藏、竖屏悬浮）。
+            hideSysBar()
+            if (!isLandscapeFullscreen()) {
+                val controller = WindowCompat.getInsetsController(window, window.decorView)
+                controller.show(WindowInsetsCompat.Type.statusBars())
+                controller.show(WindowInsetsCompat.Type.navigationBars())
+                applyStatusBarAppearance()
+            }
         }
         settleRotationAfterExit()
     }

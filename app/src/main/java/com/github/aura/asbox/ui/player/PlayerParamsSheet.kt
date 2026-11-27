@@ -119,6 +119,7 @@ private fun PlaybackParams(
             selected = osdVisible,
             onClick = onToggleOsd,
             modifier = Modifier.fillMaxWidth(),
+            large = true,
         )
         sheet.onSearchDanmu?.let { onSearch ->
             Spacer(Modifier.height(playerDim(R.dimen.vs_30)))
@@ -133,6 +134,7 @@ private fun PlaybackParams(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
+                large = true,
             )
         }
     }
@@ -156,6 +158,7 @@ private fun ParamsChoiceGroup(
                 selected = index == choice.selected,
                 onClick = { choice.onSelect(index) },
                 contentPadding = playerDim(R.dimen.vs_20),
+                large = true,
             )
         }
     }
@@ -173,14 +176,15 @@ internal fun ParamsGroupHeader(
                 painter = painterResource(iconRes),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(playerDim(R.dimen.vs_24)),
+                modifier = Modifier.size(playerDim(R.dimen.vs_30)),
             )
             Spacer(Modifier.width(playerDim(R.dimen.vs_10)))
         }
         Text(
             text = stringResource(labelRes),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = playerTextSize(R.dimen.ts_22),
+            fontSize = playerTextSize(R.dimen.ts_26),
+            lineHeight = playerTextSize(R.dimen.ts_26),
             fontWeight = FontWeight.Medium,
             modifier = Modifier.weight(1f),
         )
@@ -188,7 +192,8 @@ internal fun ParamsGroupHeader(
             Text(
                 text = it,
                 color = MaterialTheme.colorScheme.onSurface,
-                fontSize = playerTextSize(R.dimen.ts_22),
+                fontSize = playerTextSize(R.dimen.ts_26),
+                lineHeight = playerTextSize(R.dimen.ts_26),
                 fontWeight = FontWeight.Medium,
             )
         }
@@ -237,6 +242,7 @@ private fun ParamsTimeGroup(sheet: ParamsSheetState) {
             selected = startActive,
             onClick = sheet.onSetTimeStart,
             modifier = Modifier.weight(1f),
+            large = true,
         )
         SheetButton(
             text = timeMarkText(sheet.timeEndText, R.string.player_time_end, R.string.player_params_set_end),
@@ -244,12 +250,14 @@ private fun ParamsTimeGroup(sheet: ParamsSheetState) {
             selected = endActive,
             onClick = sheet.onSetTimeEnd,
             modifier = Modifier.weight(1f),
+            large = true,
         )
         SheetActionButton(
             text = stringResource(R.string.common_clear),
             iconRes = R.drawable.ic_delete,
             onClick = sheet.onResetTime,
             modifier = Modifier.weight(1f),
+            large = true,
         )
     }
 }
